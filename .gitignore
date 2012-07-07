@@ -1,2 +1,7 @@
 ## apk files:
-*apk
+*/bin/*apk
+*/bin/classes/
+*/bin/*cache
+*/bin/*res
+
+

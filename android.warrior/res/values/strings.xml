@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Warrior</string>
+    <string name="enable">enable</string>
+    <string name="disable">disable</string>
+    <string name="scan">scan</string>
+     <string name="transmit">transmit</string>
+     <string name="noDevices">no devices to connection</string>
+
+</resources>

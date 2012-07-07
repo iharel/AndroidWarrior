@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:orientation="vertical" >
+
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	    android:layout_width="wrap_content"
+	    android:layout_height="wrap_content"
+	    android:orientation="horizontal" >
+	  	<TextView
+			android:id="@+id/tv"
+		    android:layout_width="wrap_content"
+			android:layout_height="wrap_content" 
+			android:textSize="20dp"/>
+	    <Button 
+	        android:id="@+id/butEnable"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="@string/enable"/>
+	    
+	    <Button 
+	        android:id="@+id/butScan"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="@string/scan"
+	        android:enabled="false"/>
+	    
+	       <Button 
+	        android:id="@+id/butDisable"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="@string/disable"
+	        android:enabled="false"/>
+	       
+	       <Button 
+	        android:id="@+id/butTransmit"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="@string/transmit"
+	        android:enabled="false"/>
+    </LinearLayout>
+    <ListView 
+        android:id="@+id/lv"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"/>
+    <TextView
+		android:id="@+id/tvEmpty"
+	    android:layout_width="wrap_content"
+		android:layout_height="wrap_content" 
+		android:textSize="20dp"
+		android:text="@string/noDevices"
+		android:visibility="gone"/>
+
+</LinearLayout>
