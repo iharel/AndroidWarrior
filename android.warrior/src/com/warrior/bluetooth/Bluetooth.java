@@ -37,7 +37,6 @@ public class Bluetooth {
 	private final UUID UUID_RFCOMM_GENERIC = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 	Server btServer;
 	Client btClient;
-	Socket btSocket;
 	MainActivity main = (MainActivity)context;
 
 
@@ -45,9 +44,9 @@ public class Bluetooth {
 	{
 		this.context = context;
 		btAdapter= BluetoothAdapter.getDefaultAdapter();
+		
 		btServer = new Server();
 		btClient = new Client();
-		btSocket = new Socket();
 
 		if(btAdapter == null)
 		{
@@ -66,20 +65,6 @@ public class Bluetooth {
 		{
 			btAdapter.disable();
 			btAdapter.cancelDiscovery();
-			if(btServer.getStatus() == Status.RUNNING)
-			{
-				btServer.closeConnection();
-			}
-			if(btClient.getStatus() == Status.RUNNING)
-			{
-				btClient.closeConnection();
-				btClient.cancel(true);
-			}
-			if(btSocket.getStatus() == Status.RUNNING)
-			{
-				btSocket.closeConnection();
-				btSocket.cancel(true);
-			}
 		}
 	}
 	public void startScanning()
@@ -87,28 +72,31 @@ public class Bluetooth {
 		btAdapter.startDiscovery();
 	}
 	// this is server side
-	public class Server extends AsyncTask<Void, Void, Void>
+	public class Server implements Runnable
 	{
 		private BluetoothServerSocket serverSocket;
 		final static String NAME = "warroir";
-		BluetoothSocket socket = null; 
-		protected void onPreExecute(){
-			try {
-				// MY_UUID is the app's UUID string, also used by the client code
-				serverSocket = btAdapter.listenUsingRfcommWithServiceRecord(NAME, UUID_RFCOMM_GENERIC);
-			} catch (IOException e) {
-				Toast.makeText(context, "you have problam in bluetooth", Toast.LENGTH_SHORT).show();
-				return;
+		BluetoothSocket socket; 
+		boolean running = false;
+		
+		public void createListen()throws Exception
+		{
+			if(!btAdapter.isEnabled())
+			{
+				throw new Exception();
 			}
+			serverSocket = btAdapter.listenUsingRfcommWithServiceRecord(NAME, UUID_RFCOMM_GENERIC);
+			Thread threadServer=new Thread(this);
+			threadServer.start();
 		}
-		protected Void doInBackground(Void... arg0) {
+		public void run() {
 			try {
+				running = true;
 				socket = serverSocket.accept();
 				// If a connection was accepted
 				if (socket != null) {
 					// Do work to manage the connection (in a separate thread)
 					btAdapter.cancelDiscovery();
-					btSocket.execute(socket);
 				}
 			} catch (IOException e) {
 				Toast.makeText(context, e.getMessage(),Toast.LENGTH_SHORT).show();
@@ -116,200 +104,55 @@ public class Bluetooth {
 			catch (Exception e) {
 				Toast.makeText(context, e.getMessage(),Toast.LENGTH_SHORT).show();
 			}
-			return null;
+			running = false;
 		}
-		public void closeConnection()
+		public BluetoothSocket getSocket()
 		{
-			try {
-				if(socket != null)
-				{
-					socket.close();
-					Toast.makeText(context, "the connection is colsed by the server", Toast.LENGTH_SHORT).show();
-				}
-			} catch (IOException e) {
-				Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
-				return;
-			}
+			return socket;
 		}
+		public boolean getRunning()
+		{
+			return running;
+		}
+		
 	}
-	public class Client extends AsyncTask<BluetoothDevice, Void, Boolean>
+	public class Client implements Runnable
 	{
 		private BluetoothSocket socket;
-		protected Boolean doInBackground(BluetoothDevice... devices) {
-			boolean retValue = true;
+		private BluetoothDevice device;
+		boolean running = false;
+		public BluetoothSocket getSocket()
+		{
+			return socket;
+		}
+		public boolean getRunning()
+		{
+			return running;
+		}
+		public void run() {
 			try {
-				// create socket with other device
-				socket = devices[0].createRfcommSocketToServiceRecord(UUID_RFCOMM_GENERIC);
 				btAdapter.cancelDiscovery();
+				running = true;
+				// create socket with other device
+				if(device == null)
+				{
+					throw new NullPointerException();
+				}
+				socket = device.createRfcommSocketToServiceRecord(UUID_RFCOMM_GENERIC);
 				socket.connect();
-
 			} catch (IOException e) {
 				// service discovery failed
 				Log.d("gal",e.getMessage());
 			}
-			btSocket.execute(socket);
-			return retValue;
-		}
-		protected void onPostExecute(boolean result) {
-			if(result)
-			{
-				Log.d("gal","start onPostExecute");
-
-				return;
-			}
-			Toast.makeText(context,"the connection faild", Toast.LENGTH_SHORT).show();
-
-		}
-		protected void onCancelled() {
-			Log.d("gal","the client is died");
-		}
-		public void closeConnection()
-		{
-			try {
-				if(socket != null)
-				{
-					socket.close();
-					Toast.makeText(context, "the connection is colsed by the client", Toast.LENGTH_SHORT).show();
-				}
-			} catch (IOException e) {
-				Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
-				return;
-			}
-		}
-
-	}
-	// this is connection between server and client
-	public class Socket extends AsyncTask<BluetoothSocket,String,Void>
-	{
-		private InputStream inStream;
-		private OutputStream outStream;
-		private boolean running = true;
-		private BluetoothSocket socket;
-		protected Void doInBackground(BluetoothSocket... sockets) {
-			socket = sockets[0];
-			byte[] buffer = new byte[1024];  // buffer store for the stream
-			btServer.cancel(true);
-			btClient.cancel(true);
-			try {
-				inStream = socket.getInputStream();
-				outStream = socket.getOutputStream();
-				while (running) {
-					inStream.read(buffer);
-					// get string
-					main.T3 = System.nanoTime();
-					ByteArrayOutputStream bos = new ByteArrayOutputStream();
-					DataOutputStream dos = new DataOutputStream(bos);
-					try {
-						dos.writeLong(main.T3);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-					String data = new String(buffer);
-					publishProgress(data);
-
-					// get integer
-					//int i = buffer[0];
-					//publishProgress(String.valueOf(i));
-				}
-			} catch (IOException e) {
-				Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
-			}
-			return null;
-		}
-
-		protected void onProgressUpdate(long... value) {
-			if (main.getIsServer())
-			{
-				switch(main.getState())
-				{
-					case 0:
-					{
-						// do nothing. Main activity will send initial time stamp
-						break;
-
-					}
-					case 1: 
-					{
-						Long deltaNs = (main.T3-main.T0) - value[0];
-						Long deltaNsRoundTrip = (main.T3-main.T0);
-						String serverText = "Delta found by server: " + String.valueOf(deltaNs) + ". Delta roundTrip was " + deltaNsRoundTrip + " delta on Client side was: " + value[0];
-						Toast.makeText(context, serverText , Toast.LENGTH_SHORT).show();
-						main.setState(2);
-						break;
-	
-					}
-				}
-			}
-			else // CLIENT SIDE: 
-			{
-				switch(main.getState())
-				{
-					case 0:
-					{
-						Long tSend = System.nanoTime();
-						ByteArrayOutputStream bos = new ByteArrayOutputStream();
-						DataOutputStream dos = new DataOutputStream(bos);
-						try {
-							dos.writeLong(tSend - main.T3);
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						
-						writeToDevice(bos.toByteArray());
-						Long tDelta = tSend - main.T3;
-						String clientText = "sent in Client the delta: " + tDelta + " and tSend, tReceive were: " + tSend + " , " + main.T3;
-						Toast.makeText(context, clientText , Toast.LENGTH_SHORT).show();
-						break;
-
-					}
-					case 1: 
-					{
-						
-						break;
-	
-					}
-				}
-
-				
-			}
-
-			
-
-		}
-		protected void onCancelled() {
 			running = false;
+			
 		}
-		public void closeConnection()
+		public void connectionToServer(BluetoothDevice device)
 		{
-			try {
-				if(socket != null)
-				{
-					socket.close();
-					Toast.makeText(context, "the connection is colsed", Toast.LENGTH_SHORT).show();
-				}
-			} catch (IOException e) {
-				Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
-				return;
-			}
+			this.device = device;
+			Thread threadClient=new Thread(this);
+			threadClient.start();
 		}
-		public void writeToDevice(byte[] data)
-		{
-			try {
-				for(int i=0;i<data.length;i++)
-				{
-					outStream.write(data[i]);
-				}
-			} catch (IOException e) {
-				Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
-				return;
-			}
-		}
-	}
-	public Socket getInstanceSocket()
-	{
-		return  btSocket;
 	}
 	public Server getInstanceServer()
 	{
