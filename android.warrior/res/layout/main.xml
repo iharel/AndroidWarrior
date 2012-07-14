@@ -31,12 +31,31 @@
 	        android:layout_height="wrap_content"
 	        android:text="@string/disable"
 	        android:enabled="false"/>
-	       
-	       <Button 
-	        android:id="@+id/butTransmit"
+	</LinearLayout>
+	
+	<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+		android:layout_width="wrap_content"
+	    android:layout_height="wrap_content"
+	    android:orientation="horizontal" >
+	      
+	    <Button 
+	     	android:id="@+id/butOpenServer"
 	        android:layout_width="wrap_content"
 	        android:layout_height="wrap_content"
-	        android:text="@string/transmit"
+	        android:text="@string/openServer"
+	        android:enabled="false"/>
+	    <Button 
+	     	android:id="@+id/butClose"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="@string/close"
+	        android:enabled="false"/>
+	       
+	       <Button 
+	        android:id="@+id/butSync"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:text="@string/sync"
 	        android:enabled="false"/>
     </LinearLayout>
     <ListView 

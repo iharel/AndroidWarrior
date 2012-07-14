@@ -34,13 +34,12 @@ import com.gal.bluetooth1.R;
 
 public class MainActivity extends Activity implements OnClickListener, OnItemClickListener,IDataRecive {
 
-	private Button butEnable,butDisable,butScan,butTransmit;
+	private Button butEnable,butClose,butDisable,butScan,butSync,butOpenServer;
 	private ListView lv;
 	private Bluetooth bt;
 	private TextView tv;
 	private ArrayAdapter<String> devicesNamesAdapter;
 	private List<BluetoothDevice>devicesList;
-	private final static int RESULT_ENABLE_BT = 1;
 	private boolean isServer = true;
 	private Integer state = 0;
 	private Long T0;
@@ -50,58 +49,64 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
         
+        bt = new Bluetooth(this);        
         devicesNamesAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
         devicesList = new ArrayList<BluetoothDevice>();
-
-        bt = new Bluetooth(this);
-        butEnable = (Button)findViewById(R.id.butEnable);
-        butDisable = (Button)findViewById(R.id.butDisable);
-        butScan = (Button)findViewById(R.id.butScan);
-        butTransmit = (Button)findViewById(R.id.butTransmit);
-        tv = (TextView)findViewById(R.id.tv);
-        lv = (ListView)findViewById(R.id.lv);
-        lv.setEmptyView((TextView)findViewById(R.id.tvEmpty));
-        
-        lv.setOnItemClickListener(this);
-        butEnable.setOnClickListener(this);
-        butDisable.setOnClickListener(this);
-        butScan.setOnClickListener(this);
-        butTransmit.setOnClickListener(this);
-        
-        IntentFilter iDeviceFound = new IntentFilter(BluetoothDevice.ACTION_FOUND);
-		IntentFilter iConnectedBluetooth = new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED);
-		IntentFilter iDisConnectedBluetooth = new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-		IntentFilter iStateBluetoothChanged = new IntentFilter(bt.getInstanceAdapter().ACTION_STATE_CHANGED);
-		IntentFilter iDiscoveryFinished = new IntentFilter(bt.getInstanceAdapter().ACTION_DISCOVERY_FINISHED);
-        registerReceiver(ReceiverBluetooth, iDeviceFound); 
-        registerReceiver(ReceiverBluetooth, iConnectedBluetooth);
-        registerReceiver(ReceiverBluetooth, iDisConnectedBluetooth);
-        registerReceiver(ReceiverBluetooth, iStateBluetoothChanged);
-        registerReceiver(ReceiverBluetooth, iDiscoveryFinished);
+        buildViewReferece();
+        buildIntentFilter();
+        BuildEvents();
+    }
+    private void buildViewReferece()
+    {
+    	  butEnable = (Button)findViewById(R.id.butEnable);
+          butClose = (Button)findViewById(R.id.butClose);
+          butDisable = (Button)findViewById(R.id.butDisable);
+          butScan = (Button)findViewById(R.id.butScan);
+          butSync = (Button)findViewById(R.id.butSync);
+          butOpenServer = (Button)findViewById(R.id.butOpenServer);
+          tv = (TextView)findViewById(R.id.tv);
+          lv = (ListView)findViewById(R.id.lv);
+          lv.setEmptyView((TextView)findViewById(R.id.tvEmpty));
+    }
+    private void buildIntentFilter()
+    {
+    	IntentFilter iDeviceFound = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+  		IntentFilter iConnectedBluetooth = new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED);
+  		IntentFilter iDisConnectedBluetooth = new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+  		IntentFilter iStateBluetoothChanged = new IntentFilter(bt.getInstanceAdapter().ACTION_STATE_CHANGED);
+  		IntentFilter iDiscoveryFinished = new IntentFilter(bt.getInstanceAdapter().ACTION_DISCOVERY_FINISHED);
+  		registerReceiver(ReceiverBluetooth, iDeviceFound); 
+  		registerReceiver(ReceiverBluetooth, iConnectedBluetooth);
+  		registerReceiver(ReceiverBluetooth, iDisConnectedBluetooth);
+  		registerReceiver(ReceiverBluetooth, iStateBluetoothChanged);
+  		registerReceiver(ReceiverBluetooth, iDiscoveryFinished);
+    }
+    private void BuildEvents()
+    {
+    	   lv.setOnItemClickListener(this);
+           butEnable.setOnClickListener(this);
+           butClose.setOnClickListener(this);
+           butDisable.setOnClickListener(this);
+           butScan.setOnClickListener(this);
+           butSync.setOnClickListener(this);
+           butOpenServer.setOnClickListener(this);
     }
 	public void onClick(View v) {
 		if(v.equals(butEnable))
 		{
-			butDisable.setEnabled(true);
-			butScan.setEnabled(true);
-			butEnable.setEnabled(false);
 			bt.enableBluetooth();
 		}	
 		else if(v.equals(butDisable))
 		{
+			bt.disableBluetooth();
+		}
+		else if(v.equals(butClose))
+		{
 			try {
 				commHandler.closeConnection();
-				bt.disableBluetooth();
-				devicesList.clear();
-				butDisable.setEnabled(false);
-				butScan.setEnabled(false);
-				butTransmit.setEnabled(false);
-				butEnable.setEnabled(true);
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				Log.d("gal",e.getMessage());
 			}
-			
 		}
 		else if(v.equals(butScan))
 		{
@@ -109,21 +114,12 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 			bt.startScanning();
 			Toast.makeText(this,"the bluetooth is scanning",Toast.LENGTH_SHORT).show();
 		}
-		else if(v.equals(butTransmit))
+		else if(v.equals(butSync))
 		{
 			if (isServer)
 			{
 				T0 = System.nanoTime();
-				ByteArrayOutputStream bos = new ByteArrayOutputStream();
-				DataOutputStream dos = new DataOutputStream(bos);
-				try {
-					dos.writeLong(T0);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				
-				commHandler.writeToRmoteDevice(bos.toByteArray());
+				commHandler.writeToRmoteDevice(Convert.convertLongToArrayBytes(T0));
 				state = 1; // sent T0 to client device
 			}
 			else
@@ -131,9 +127,21 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 				 //shouldn't have gotten here. 
 			}
 		}
+		else if(v.equals(butOpenServer))
+		{
+			if(!bt.getInstanceServer().getRunning())
+			{
+    			try {
+					bt.getInstanceServer().createListen();
+					Toast.makeText(this,"the server is open",Toast.LENGTH_SHORT).show();
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
 	}
 	protected void onDestroy() {
-		bt.disableBluetooth();
 		this.unregisterReceiver(ReceiverBluetooth);
 		super.onDestroy();
 	}
@@ -175,7 +183,7 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 			    		{
 			    			commHandler.execute();
 			    		}
-			    		butTransmit.setEnabled(true);
+			    		butSync.setEnabled(true);
 			    	}
 			    	else
 			    	{
@@ -189,28 +197,37 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 				}
+		    	butClose.setEnabled(true);
+			    butOpenServer.setEnabled(false);
+			   	butDisable.setEnabled(false);
+			   	butScan.setEnabled(false);
+			   	devicesList.clear();
 		    }
 		    else if(BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action))
 		    {
 		    	Toast.makeText(context,"the connection is closed",Toast.LENGTH_SHORT).show();
+		    	butSync.setEnabled(false);
+		    	butDisable.setEnabled(true);
 		    }
 		    else if(bt.getInstanceAdapter().ACTION_STATE_CHANGED.equals(action))
 		    {
 		    	if(bt.getInstanceAdapter().isEnabled())
 		    	{
-		    		if(!bt.getInstanceServer().getRunning())
-	    			{
-		    			try {
-							bt.getInstanceServer().createListen();
-						} catch (Exception e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-	    			}
+		    		butDisable.setEnabled(true);
+					butScan.setEnabled(true);
+					butEnable.setEnabled(false);
+					butOpenServer.setEnabled(true);
 		    		Toast.makeText(context,"the bluetooth is enable",Toast.LENGTH_SHORT).show();
 		    	}
 		    	else
 		    	{
+		    		devicesList.clear();
+					butDisable.setEnabled(false);
+					butScan.setEnabled(false);
+					butSync.setEnabled(false);
+					butClose.setEnabled(false);
+					butEnable.setEnabled(true);
+					butOpenServer.setEnabled(false);
 		    		Toast.makeText(MainActivity.this,"the bluetooth is disable",Toast.LENGTH_SHORT).show();
 		    	}
 		    }
@@ -222,7 +239,7 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		
 	};
 	public void dataRecive(byte[] data) {
-		long value = convertBytesToLong(data);
+		long value = Convert.convertArrayBytesToLong(data);
 		tv.setText(String.valueOf(value));
 		if (isServer)
 		{

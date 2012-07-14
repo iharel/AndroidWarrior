@@ -62,8 +62,8 @@ public class Bluetooth {
 	{
 		if(btAdapter.isEnabled())
 		{
-			btAdapter.disable();
 			btAdapter.cancelDiscovery();
+			btAdapter.disable();
 		}
 	}
 	public void startScanning()
@@ -90,11 +90,10 @@ public class Bluetooth {
 		}
 		public void run() {
 			try {
+				Log.d("gal","start server running");
 				running = true;
 				socket = serverSocket.accept();
-				// If a connection was accepted
 				if (socket != null) {
-					// Do work to manage the connection (in a separate thread)
 					btAdapter.cancelDiscovery();
 				}
 			} catch (IOException e) {
@@ -104,6 +103,7 @@ public class Bluetooth {
 				Toast.makeText(context, e.getMessage(),Toast.LENGTH_SHORT).show();
 			}
 			running = false;
+			Log.d("gal","end server running");
 		}
 		public BluetoothSocket getSocket()
 		{

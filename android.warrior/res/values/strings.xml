@@ -4,8 +4,10 @@
     <string name="app_name">Warrior</string>
     <string name="enable">enable</string>
     <string name="disable">disable</string>
+    <string name="close">close</string>
+      <string name="openServer">open server</string>
     <string name="scan">scan</string>
-     <string name="transmit">transmit</string>
-     <string name="noDevices">no devices to connection</string>
+    <string name="sync">start sync</string>
+    <string name="noDevices">no devices to connection</string>
 
 </resources>
