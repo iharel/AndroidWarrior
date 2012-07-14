@@ -1,4 +1,4 @@
-package com.warrior.bluetooth;
+package com.warrior.main;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -12,7 +12,6 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.gal.bluetooth1.R;
-import com.warrior.main.MainActivity;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;

@@ -31,8 +31,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.gal.bluetooth1.R;
-import com.warrior.bluetooth.Bluetooth;
-import com.warrior.bluetooth.CommHandler;
 
 public class MainActivity extends Activity implements OnClickListener, OnItemClickListener,IDataRecive {
 

@@ -1,4 +1,4 @@
-package com.warrior.bluetooth;
+package com.warrior.main;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import com.warrior.main.MainActivity;
 
 import android.bluetooth.BluetoothSocket;
 import android.os.AsyncTask;
@@ -23,7 +22,8 @@ public class CommHandler extends AsyncTask<Void, byte[], Void>{
 	Thread mainThread;
 	public CommHandler(MainActivity main,BluetoothSocket socket) throws IOException
 	{
-		this.main = main;
+		 //System.nanoTime()
+		 this.main = main;
 		this.socket = socket;
 		inStream = socket.getInputStream();
 		outStream = socket.getOutputStream();
