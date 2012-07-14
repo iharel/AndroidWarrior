@@ -2,5 +2,5 @@ package com.warrior.main;
 
 public interface IDataReceive {
 
-	void dataReceive(byte[] data);
+	void dataReceive(Long data);
 }

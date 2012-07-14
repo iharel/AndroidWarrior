@@ -5,6 +5,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.security.Timestamp;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
@@ -118,8 +119,9 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		{
 			if (isServer)
 			{
-				sendTime = System.nanoTime();
-				commHandler.writeToRmoteDevice(Convert.convertLongToArrayBytes(sendTime));
+				sendTime = getTime();
+				commHandler.writeToRmoteDevice(sendTime);
+				Log.d("gal","time server sends data: " + sendTime);
 				state = 1; // sent T0 to client device
 			}
 			else
@@ -238,8 +240,7 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		}
 		
 	};
-	public void dataReceive(byte[] data) {
-		long value = Convert.convertArrayBytesToLong(data);
+	public void dataReceive(Long value) {
 		tv.setText(String.valueOf(value));
 		if (isServer)
 		{
@@ -273,22 +274,15 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 				case 0:
 				{// received first sync message. receiveTime should contain time T1 (when T0 message was received) 	
 
-					ByteArrayOutputStream bos = new ByteArrayOutputStream();
-					DataOutputStream dos = new DataOutputStream(bos);
+					sendTime=getTime();
+ 					long deltaInsideClient = sendTime - receiveTime;
 					
-					try {
-						sendTime=System.nanoTime();
-						dos.writeLong(sendTime - receiveTime);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-					
-					commHandler.writeToRmoteDevice(bos.toByteArray());
+					commHandler.writeToRmoteDevice(deltaInsideClient);
 					Long tDelta = sendTime - receiveTime;
 					String clientText = "sent in Client the delta: " + tDelta + 
 							" and tSend, tReceive were: " + sendTime + " , " + receiveTime;
-					
+					Log.d("gal", "sent message to server in time:  " + String.valueOf(sendTime));
+
 					Toast.makeText(this, clientText , Toast.LENGTH_SHORT).show();
 					break;
 
@@ -323,8 +317,15 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		}
 		return value;
 	}
-	public void setReceiveTime(long nanoTime) {
+	public void setReceiveTime(long time) {
 		// TODO Auto-generated method stub
-		this.receiveTime = nanoTime;
+		this.receiveTime = time;
+	}
+	public long getReceiveTime() {
+		// TODO Auto-generated method stub
+		return this.receiveTime;
+	}
+	public long getTime() {
+		return System.currentTimeMillis();// nanoTime();
 	}
 }

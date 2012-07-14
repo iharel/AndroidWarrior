@@ -19,11 +19,12 @@ public class Convert {
 	}
 	static public long convertArrayBytesToLong(byte[] data)
 	{
-		Long value = (long) 0;
-		for (int i = 0; i < data.length; i++)
+		long l = 0;
+		for (int i = 0; i<8; i++)
 		{
-		   value += ((long) data[i] & 0xffL) << (8 * i);
+			l <<=8;
+			l^=(long)data[i] & 0xff;
 		}
-		return value;
+		return l;
 	}
 }
