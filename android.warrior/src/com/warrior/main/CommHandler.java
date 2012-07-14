@@ -53,6 +53,7 @@ public class CommHandler extends AsyncTask<Void, byte[], Void>{
 		while (running) {
 			try {
 				inStream.read(buffer);
+				main.setReceiveTime(System.nanoTime());
 				publishProgress(buffer);
 			} catch (IOException e) {
 				Log.d("gal",e.getMessage());
@@ -64,6 +65,6 @@ public class CommHandler extends AsyncTask<Void, byte[], Void>{
 		return null;
 	}
 	protected void onProgressUpdate(byte[]... values) {
-		main.dataRecive(values[0]);
+		main.dataReceive(values[0]);
 	}
 }

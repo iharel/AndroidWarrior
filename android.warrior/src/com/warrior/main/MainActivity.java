@@ -32,7 +32,7 @@ import android.widget.Toast;
 
 import com.gal.bluetooth1.R;
 
-public class MainActivity extends Activity implements OnClickListener, OnItemClickListener,IDataRecive {
+public class MainActivity extends Activity implements OnClickListener, OnItemClickListener,IDataReceive {
 
 	private Button butEnable,butClose,butDisable,butScan,butSync,butOpenServer;
 	private ListView lv;
@@ -41,9 +41,9 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 	private ArrayAdapter<String> devicesNamesAdapter;
 	private List<BluetoothDevice>devicesList;
 	private boolean isServer = true;
-	private Integer state = 0;
-	private Long T0;
-	private Long T3 = (long) 0;
+	private int state = 0;
+	private Long sendTime;
+	private Long receiveTime = (long) 0;
 	private CommHandler commHandler;
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -118,8 +118,8 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		{
 			if (isServer)
 			{
-				T0 = System.nanoTime();
-				commHandler.writeToRmoteDevice(Convert.convertLongToArrayBytes(T0));
+				sendTime = System.nanoTime();
+				commHandler.writeToRmoteDevice(Convert.convertLongToArrayBytes(sendTime));
 				state = 1; // sent T0 to client device
 			}
 			else
@@ -238,7 +238,7 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		}
 		
 	};
-	public void dataRecive(byte[] data) {
+	public void dataReceive(byte[] data) {
 		long value = Convert.convertArrayBytesToLong(data);
 		tv.setText(String.valueOf(value));
 		if (isServer)
@@ -253,10 +253,11 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 				}
 				case 1: 
 				{
-					Long deltaNs = (T3-T0) - value;
-					Long deltaNsRoundTrip = (T3-T0);
-					String serverText = "Delta found by server: " + String.valueOf(deltaNs) + 
-							". Delta roundTrip was " + deltaNsRoundTrip + " delta on Client side was: " + value;
+					Long deltaInClientSide = value;
+					Long deltaNsRoundTrip = (receiveTime-sendTime);
+					Long airTimeTotal = deltaNsRoundTrip - deltaInClientSide;
+					String serverText = "Delta found by server: " + String.valueOf(airTimeTotal) + 
+							". Delta roundTrip was " + deltaNsRoundTrip + " delta on Client side was: " + deltaInClientSide;
 					Toast.makeText(this, serverText , Toast.LENGTH_SHORT).show();
 					state = 2;
 					break;
@@ -270,22 +271,24 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 			switch(state)
 			{
 				case 0:
-				{	
-					Long tSend = System.nanoTime();
+				{// received first sync message. receiveTime should contain time T1 (when T0 message was received) 	
+
 					ByteArrayOutputStream bos = new ByteArrayOutputStream();
 					DataOutputStream dos = new DataOutputStream(bos);
 					
 					try {
-						dos.writeLong(tSend - T3);
+						sendTime=System.nanoTime();
+						dos.writeLong(sendTime - receiveTime);
 					} catch (IOException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 					
 					commHandler.writeToRmoteDevice(bos.toByteArray());
-					Long tDelta = tSend - T3;
+					Long tDelta = sendTime - receiveTime;
 					String clientText = "sent in Client the delta: " + tDelta + 
-							" and tSend, tReceive were: " + tSend + " , " + T3;
+							" and tSend, tReceive were: " + sendTime + " , " + receiveTime;
+					
 					Toast.makeText(this, clientText , Toast.LENGTH_SHORT).show();
 					break;
 
@@ -301,6 +304,16 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 			
 		}
 	}
+	public enum ClientStates {
+		WAIT_FOR_SYNC_START,
+		FIRST_SYNC_PKT_RECEIVED;
+		}
+	public enum ServerStates {
+		WAIT_FOR_SYNC_START,
+		START_SYNC_PROCESS,
+		SECOND_SYNC_PKT_RECEIVED;
+		}
+
 	private long convertBytesToLong(byte[] data)
 	{
 		Long value = (long) 0;
@@ -309,5 +322,9 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		   value += ((long) data[i] & 0xffL) << (8 * i);
 		}
 		return value;
+	}
+	public void setReceiveTime(long nanoTime) {
+		// TODO Auto-generated method stub
+		this.receiveTime = nanoTime;
 	}
 }
