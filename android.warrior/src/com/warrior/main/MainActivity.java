@@ -5,6 +5,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.security.Timestamp;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import android.app.Activity;
@@ -239,9 +240,13 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 			switch(state)
 			{
 				case 0:
-				{
-					// received first sync message. receiveTime should contain time T1 (when T0 message was received)
-					sendTime = getTime();
+
+				{// received first sync message. receiveTime should contain time T1 (when T0 message was received) 	
+
+					sendTime=getTime();
+ 					long deltaInsideClient = sendTime - receiveTime;
+					
+					commHandler.writeToRmoteDevice(deltaInsideClient);
 					Long tDelta = sendTime - receiveTime;
 					commHandler.writeToRmoteDevice(tDelta);
 					String clientText = "sent in Client the delta: " + tDelta + 
@@ -290,6 +295,7 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 	}
 	public long getReceiveTime() {
 		// TODO Auto-generated method stub
+
 		return this.receiveTime;
 	}
 	public long getTime() {

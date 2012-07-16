@@ -35,6 +35,7 @@ public class CommHandler extends AsyncTask<Void, Long, Void>{
 	{
 		try {
 			outStream.writeLong(data);
+
 		} catch (IOException e) {
 			Toast.makeText(main, e.getMessage(), Toast.LENGTH_SHORT).show();
 			return;
