@@ -1,8 +1,11 @@
 package com.warrior.main;
 
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.security.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
@@ -17,6 +20,7 @@ import android.content.IntentFilter;
 import android.net.wifi.WifiConfiguration.Status;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -43,6 +47,9 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 	private Long sendTime;
 	private Long receiveTime = (long) 0;
 	private CommHandler commHandler;
+	
+	private int tempCounter = 0;
+	private long[] tempCounterArray = new long[50];
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
@@ -120,10 +127,13 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		{
 			if (isServer)
 			{
-				sendTime = getTime();
-				commHandler.writeToRmoteDevice(sendTime);
-				Log.d("gal","time server sends data: " + sendTime);
-				state = 1; // sent T0 to client device
+				for (int i = 0; i<50; i++)
+				{
+					sendTime = getTime();
+					commHandler.writeToRmoteDevice(sendTime);
+					Log.d("gal","time server sends data in iteration: " + i + " : " + sendTime);
+					state = 1; // sent T0 to client device
+				}
 			}
 		}
 		else if(v.equals(butOpenServer))
@@ -223,13 +233,42 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 					Long deltaInClientSide = value;
 					Long deltaNsRoundTrip = (receiveTime-sendTime);
 					Long airTimeTotal = deltaNsRoundTrip - deltaInClientSide;
+					tempCounterArray[tempCounter] = airTimeTotal;
+					tempCounter++;
 					String serverText = "Delta found by server: " + String.valueOf(airTimeTotal) + 
 							". Delta roundTrip was " + deltaNsRoundTrip + " delta on Client side was: " + deltaInClientSide;
 					Toast.makeText(this, serverText , Toast.LENGTH_SHORT).show();
 					Log.d("gal","round trip is:" + deltaNsRoundTrip);
 					Log.d("gal","air time is:" + airTimeTotal);
-					state = 2;
+					state = 1;
+					if (tempCounter == 49)
+					{
+						FileWriter fw = null;
+						try {
+				            String fileName = Environment.getExternalStorageDirectory().getAbsolutePath() + "/WarriorTrials/fiftyTrials.txt";
+							Log.d("gal",fileName);
+				            fw = new FileWriter(fileName);
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+							Log.d("gal","WARNING: COULDNT CREATE THE FILE");
+						}
+						BufferedWriter bw =  new BufferedWriter(fw);
+						PrintWriter pOut = new PrintWriter(bw);
+						String line = null;
+						for (int j = 0; j<50; j++) 
+						{
+							pOut.println(tempCounterArray[j]);   //  eventually goes to writeme.txt.
+
+						}
+
+						pOut.flush();
+						pOut.close();
+
+					}
+
 					break;
+					
 
 				}
 			}
