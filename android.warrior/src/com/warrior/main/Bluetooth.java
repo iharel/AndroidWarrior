@@ -1,51 +1,32 @@
 package com.warrior.main;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
+
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.util.Set;
 import java.util.UUID;
-
-import com.gal.bluetooth1.R;
-
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.os.AsyncTask;
-import android.os.AsyncTask.Status;
-import android.sax.StartElementListener;
+import android.os.Handler;
 import android.util.Log;
-import android.widget.ArrayAdapter;
-import android.widget.SlidingDrawer;
 import android.widget.Toast;
 
 public class Bluetooth {
 	private BluetoothAdapter btAdapter;
 	private Context context;
 	private final static int ALWAYS_DISCOVERY = 0;
-	private final UUID UUID_RFCOMM_GENERIC = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
-	Server btServer;
-	Client btClient;
-	MainActivity main = (MainActivity)context;
-
+	private final static UUID UUID_RFCOMM_GENERIC = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+	private final static int TIME_OUT = 20000;
+	private BluetoothSocket socketServer;
+	private BluetoothSocket socketClient; 
 
 	public Bluetooth(Context context)
 	{
 		this.context = context;
 		btAdapter= BluetoothAdapter.getDefaultAdapter();
-		
-		btServer = new Server();
-		btClient = new Client();
 
 		if(btAdapter == null)
 		{
@@ -70,14 +51,15 @@ public class Bluetooth {
 	{
 		btAdapter.startDiscovery();
 	}
+	public boolean isEnabled()
+	{
+		return btAdapter.isEnabled();
+	}
 	// this is server side
-	public class Server implements Runnable
+	public class Server extends AsyncTask<Void, String, Void>
 	{
 		private BluetoothServerSocket serverSocket;
 		final static String NAME = "warroir";
-		BluetoothSocket socket; 
-		boolean running = false;
-		
 		public void createListen()throws Exception
 		{
 			if(!btAdapter.isEnabled())
@@ -85,84 +67,70 @@ public class Bluetooth {
 				throw new Exception();
 			}
 			serverSocket = btAdapter.listenUsingRfcommWithServiceRecord(NAME, UUID_RFCOMM_GENERIC);
-			Thread threadServer=new Thread(this);
-			threadServer.start();
+			execute();
 		}
-		public void run() {
+		protected Void doInBackground(Void... params) {
 			try {
-				Log.d("gal","start server running");
-				running = true;
-				socket = serverSocket.accept();
-				if (socket != null) {
+				publishProgress("the server is open");
+				socketServer = serverSocket.accept(TIME_OUT);
+				if (socketServer != null) {
 					btAdapter.cancelDiscovery();
 				}
 			} catch (IOException e) {
-				Toast.makeText(context, e.getMessage(),Toast.LENGTH_SHORT).show();
+				publishProgress(e.getMessage());
+				this.cancel(true);
 			}
-			catch (Exception e) {
-				Toast.makeText(context, e.getMessage(),Toast.LENGTH_SHORT).show();
-			}
-			running = false;
-			Log.d("gal","end server running");
+			return null;
 		}
-		public BluetoothSocket getSocket()
-		{
-			return socket;
+		protected void onProgressUpdate(String... values) {
+			Toast.makeText(context,values[0] ,Toast.LENGTH_SHORT).show();
 		}
-		public boolean getRunning()
-		{
-			return running;
-		}
-		
 	}
-	public class Client implements Runnable
+	public class Client extends AsyncTask<Void, String, Void>
 	{
-		private BluetoothSocket socket;
 		private BluetoothDevice device;
-		boolean running = false;
-		public BluetoothSocket getSocket()
+		
+		public void connectionToServer(BluetoothDevice device)
 		{
-			return socket;
+			this.device = device;
+			this.execute();
 		}
-		public boolean getRunning()
-		{
-			return running;
-		}
-		public void run() {
+		protected Void doInBackground(Void... params) {
 			try {
-				btAdapter.cancelDiscovery();
-				running = true;
-				// create socket with other device
 				if(device == null)
 				{
 					throw new NullPointerException();
 				}
-				socket = device.createRfcommSocketToServiceRecord(UUID_RFCOMM_GENERIC);
-				socket.connect();
+				btAdapter.cancelDiscovery();
+				socketClient = device.createRfcommSocketToServiceRecord(UUID_RFCOMM_GENERIC);
+				socketClient.connect();
 			} catch (IOException e) {
-				// service discovery failed
-				Log.d("gal",e.getMessage());
+				publishProgress(e.getMessage());
 			}
-			running = false;
-			
+			return null;
 		}
-		public void connectionToServer(BluetoothDevice device)
-		{
-			this.device = device;
-			Thread threadClient=new Thread(this);
-			threadClient.start();
+		protected void onProgressUpdate(String... values) {
+			Toast.makeText(context,values[0] ,Toast.LENGTH_SHORT).show();
 		}
 	}
-	public Server getInstanceServer()
+	public Server getCreateServer()
 	{
-		return btServer;
+		return new Server();
 	}
-	public Client getInstanceClient()
+	public Client getCreateClient()
 	{
-		return btClient;
+		return new Client();
 	}
 	public BluetoothAdapter getInstanceAdapter()
 	{
 		return btAdapter;
+	}
+	public BluetoothSocket getSocketServer()
+	{
+		return socketServer;
+	}
+	public BluetoothSocket getSocketClient()
+	{
+		return socketClient;
 	}
 }
