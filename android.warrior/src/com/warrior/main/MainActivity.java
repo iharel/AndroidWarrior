@@ -1,22 +1,24 @@
 package com.warrior.main;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.security.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.net.wifi.WifiConfiguration.Status;
-import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -29,8 +31,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.gal.bluetooth1.R;
+import com.warrior.main.Bluetooth.IServerClosed;
+import com.warrior.main.Bluetooth.Server;
+import com.warrior.main.CommHandler.IDataRecevie;
 
-public class MainActivity extends Activity implements OnClickListener, OnItemClickListener,IDataReceive {
+public class MainActivity extends Activity implements OnClickListener, OnItemClickListener, IDataRecevie {
 
 	private Button butEnable,butClose,butDisable,butScan,butSync,butOpenServer;
 	private ListView lv;
@@ -43,6 +48,11 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 	private Long sendTime;
 	private Long receiveTime = (long) 0;
 	private CommHandler commHandler;
+	private int counterReceiveData = 0;
+	private final static int MAX_RECEIVE = 49;
+	private String[] arrAirTime = new String[50];
+	private String[] arrTotalTime = new String[50];
+	private long avgAirTime = 0,avgTotalRoundTrip = 0;
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
@@ -75,8 +85,8 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
     	IntentFilter iDeviceFound = new IntentFilter(BluetoothDevice.ACTION_FOUND);
   		IntentFilter iConnectedBluetooth = new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED);
   		IntentFilter iDisConnectedBluetooth = new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-  		IntentFilter iStateBluetoothChanged = new IntentFilter(bt.getInstanceAdapter().ACTION_STATE_CHANGED);
-  		IntentFilter iDiscoveryFinished = new IntentFilter(bt.getInstanceAdapter().ACTION_DISCOVERY_FINISHED);
+  		IntentFilter iStateBluetoothChanged = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+  		IntentFilter iDiscoveryFinished = new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
   		registerReceiver(ReceiverBluetooth, iDeviceFound); 
   		registerReceiver(ReceiverBluetooth, iConnectedBluetooth);
   		registerReceiver(ReceiverBluetooth, iDisConnectedBluetooth);
@@ -104,11 +114,7 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		}
 		else if(v.equals(butClose))
 		{
-			try {
-				commHandler.closeConnection();
-			} catch (IOException e) {
-				Log.d("gal",e.getMessage());
-			}
+			commHandler.writeToRmoteDevice(commHandler.DISCONNECTED);
 		}
 		else if(v.equals(butScan))
 		{
@@ -118,21 +124,33 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		}
 		else if(v.equals(butSync))
 		{
+			
 			if (isServer)
 			{
-				sendTime = getTime();
-				commHandler.writeToRmoteDevice(sendTime);
-				Log.d("gal","time server sends data: " + sendTime);
-				state = 1; // sent T0 to client device
+				
+				for(int i=0;i<MAX_RECEIVE;i++)
+				{
+					sendTime = getTime();
+					commHandler.writeToRmoteDevice(sendTime);
+					Log.d("gal","time server sends data: " + sendTime);
+					state = 1; // sent T0 to client device
+				}
 			}
+			
 		}
 		else if(v.equals(butOpenServer))
 		{
 			try {
-				bt.getCreateServer().createListen();
+				butOpenServer.setEnabled(false);
+				Server server = bt.getCreateServer();
+				server.setListenerCloseServer(new IServerClosed() {
+					public void serverClosed() {
+						butOpenServer.setEnabled(true);
+					}
+				});
+				server.createListen();
 			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
 			}
 		}
 	}
@@ -142,8 +160,12 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 	}
 	// this is turn on the client side
 	public void onItemClick(AdapterView<?> adapter, View v, int position, long id) {
-		isServer = false;
-		bt.getCreateClient().connectionToServer(devicesList.get(position));
+		try {
+			isServer = false;
+			bt.getCreateClient().connectionToServer(devicesList.get(position));
+		} catch (Exception e) {
+			Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
+		}
 	}
 	// Create a BroadcastReceiver
 	private final BroadcastReceiver ReceiverBluetooth = new BroadcastReceiver() {
@@ -159,119 +181,82 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		    else if(BluetoothDevice.ACTION_ACL_CONNECTED.equals(action))
 		    {
 		    	BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-		    	Toast.makeText(context, "you connected to " + device.getName(), Toast.LENGTH_SHORT).show();
-		    	 try {
-			    	if(isServer)
+		    	try {
+		    		if(isServer)
 			    	{
-			    		while(bt.getSocketServer() == null){}
-			    		commHandler = new CommHandler(MainActivity.this, bt.getSocketServer());
-			    		commHandler.execute();
-			    		butSync.setEnabled(true);
+			    		if(commHandler == null)
+			    		{
+				    		while(bt.getSocketServer() == null){}
+				    		commHandler = new CommHandler(MainActivity.this, bt.getSocketServer());
+				    		commHandler.execute();
+				    		commHandler.setListenerDataRecevie(MainActivity.this);
+				    		butSync.setEnabled(true);
+			    		}
 			    	}
 			    	else
 			    	{
-			    		commHandler = new CommHandler(MainActivity.this, bt.getSocketClient());
-			    		commHandler.execute();
+			    		if(commHandler == null)
+			    		{
+				    		commHandler = new CommHandler(MainActivity.this, bt.getSocketClient());
+				    		commHandler.setListenerDataRecevie(MainActivity.this);
+				    		commHandler.execute();
+			    		}
 			    	}
 		    	 } catch (IOException e) {
 		    			Toast.makeText(context, e.getMessage() + device.getName(), Toast.LENGTH_SHORT).show();
 				}
+			    Toast.makeText(context, "you connected to " + device.getName(), Toast.LENGTH_SHORT).show();
 		    	buttonsForBtConnected();
 			   	devicesNamesAdapter.clear();
 		    }
 		    else if(BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action))
 		    {
+		    	if(commHandler != null)
+		    	{
+		    		commHandler = null;
+		    	}
+		    	if(bt != null)
+		    	{
+		    		bt.resetSockets();
+		    		bt = null;
+		    	}
+		    	System.gc();
+		    	bt = new Bluetooth(MainActivity.this);
 		    	Toast.makeText(context,"the connection is closed",Toast.LENGTH_SHORT).show();
 		    	buttonsForBtEnabled();
 		    	devicesNamesAdapter.clear();
 		    }
-		    else if(bt.getInstanceAdapter().ACTION_STATE_CHANGED.equals(action))
+		   
+		    else if(BluetoothAdapter.ACTION_STATE_CHANGED.equals(action))
 		    {
-		    	if(bt.isEnabled())
-		    	{
-		    		buttonsForBtEnabled();
-		    		Toast.makeText(context,"the bluetooth is enable",Toast.LENGTH_SHORT).show();
-		    	}
-		    	else if(!bt.isEnabled())
-		    	{
-		    		buttonsForBtDisabled();
-		    		devicesList.clear();
-		    		Toast.makeText(MainActivity.this,"the bluetooth is disable",Toast.LENGTH_SHORT).show();
-		    	}
+		    	final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
+                        BluetoothAdapter.ERROR);
+		    	switch (state) {
+		            case BluetoothAdapter.STATE_OFF:
+		            	buttonsForBtDisabled();
+			    		devicesList.clear();
+			    		Toast.makeText(MainActivity.this,"the bluetooth is disable",Toast.LENGTH_SHORT).show();
+		                break;
+		            case BluetoothAdapter.STATE_ON:
+		            	buttonsForBtEnabled();
+			    		Toast.makeText(context,"the bluetooth is enable",Toast.LENGTH_SHORT).show();
+		                break;
+	            }
 		    }
-		    else if(bt.getInstanceAdapter().ACTION_DISCOVERY_FINISHED.equals(action))
+		    else if(BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action))
 			{
-		    	Toast.makeText(context, "the discovery is finished",Toast.LENGTH_SHORT).show();
+		    	Toast.makeText(context, "the scanning is finished",Toast.LENGTH_SHORT).show();
 			}
 		}
 		
 	};
-	public void dataReceive(Long value) {
-		tv.setText(String.valueOf(value));
-		if (isServer)
-		{
-			switch(state)
-			{
-				case 0:
-				{
-					// do nothing. Main activity will send initial time stamp
-					Log.d("gal","is server" + String.valueOf(state));
-					break;
-				}
-				case 1: 
-				{
-					Long deltaInClientSide = value;
-					Long deltaNsRoundTrip = (receiveTime-sendTime);
-					Long airTimeTotal = deltaNsRoundTrip - deltaInClientSide;
-					String serverText = "Delta found by server: " + String.valueOf(airTimeTotal) + 
-							". Delta roundTrip was " + deltaNsRoundTrip + " delta on Client side was: " + deltaInClientSide;
-					Toast.makeText(this, serverText , Toast.LENGTH_SHORT).show();
-					Log.d("gal","round trip is:" + deltaNsRoundTrip);
-					Log.d("gal","air time is:" + airTimeTotal);
-					state = 2;
-					break;
-
-				}
-			}
-		}
-		else // CLIENT SIDE: 
-		{
-			Log.d("gal", "is client and the state is " + String.valueOf(state));
-			switch(state)
-			{
-				case 0:
-
-				{// received first sync message. receiveTime should contain time T1 (when T0 message was received) 	
-
-					sendTime=getTime();
- 					long deltaInsideClient = sendTime - receiveTime;
-					
-					commHandler.writeToRmoteDevice(deltaInsideClient);
-					Long tDelta = sendTime - receiveTime;
-					commHandler.writeToRmoteDevice(tDelta);
-					String clientText = "sent in Client the delta: " + tDelta + 
-							" and tSend, tReceive were: " + sendTime + " , " + receiveTime;
-					Log.d("gal", "sent message to server in time:  " + String.valueOf(sendTime));
-
-					Toast.makeText(this, clientText , Toast.LENGTH_SHORT).show();
-					break;
-
-				}
-				case 1: 
-				{
-					Log.d("gal","is client" + String.valueOf(state));
-					break;
-
-				}
-			}
-		}
-	}
 	private void buttonsForBtEnabled()
 	{
 		butDisable.setEnabled(true);
 		butScan.setEnabled(true);
 		butOpenServer.setEnabled(true);
 		butEnable.setEnabled(false);
+		butSync.setEnabled(false);
 	}
 	private void buttonsForBtDisabled()
 	{
@@ -290,15 +275,114 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 	   	butScan.setEnabled(false);
 	}
 	public void setReceiveTime(long time) {
-		// TODO Auto-generated method stub
 		this.receiveTime = time;
 	}
 	public long getReceiveTime() {
-		// TODO Auto-generated method stub
-
 		return this.receiveTime;
 	}
 	public long getTime() {
 		return System.currentTimeMillis();// nanoTime();
+	}
+	private void writeToSdcard()
+	{
+		String filename = "Results.txt";
+		File file = new File(Environment.getExternalStorageDirectory(), filename);
+		try {
+		    PrintWriter pw = new PrintWriter(new FileOutputStream(file));
+		    for(int i=0;i<MAX_RECEIVE;i++)
+		    {
+		    	pw.println("number round is:" + i);
+		    	pw.println(arrAirTime[i]);
+		    	pw.println(arrTotalTime[i]);
+		    	pw.println("********************************************************");
+		    }
+		    pw.println("********************************************************");
+		    pw.println("the air time average is:" + avgAirTime/MAX_RECEIVE);
+		    pw.println("the toatl ronud trip average is:" + avgTotalRoundTrip/MAX_RECEIVE);
+		    pw.println("********************************************************");
+		    pw.flush();
+		    pw.close();
+		} catch (FileNotFoundException e) {
+		    try {
+				file.createNewFile();
+				writeToSdcard();
+			} catch (IOException e1) {
+				Log.d("gal",e.getMessage());
+				e1.printStackTrace();
+			}
+		} catch (IOException e) {
+			Log.d("gal",e.getMessage());
+		}
+
+
+	}
+	public void dataRecevie(long data) {
+		if (isServer)
+		{
+			switch(state)
+			{
+				case 0:
+				{
+					// do nothing. Main activity will send initial time stamp
+					break;
+				}
+				case 1: 
+				{
+					long deltaInClientSide = data;
+					Long deltaNsRoundTrip = (receiveTime-sendTime);
+					Long airTimeTotal = deltaNsRoundTrip - deltaInClientSide;
+					String serverText = "Delta found by server: " + String.valueOf(airTimeTotal) + 
+							". Delta roundTrip was " + deltaNsRoundTrip + " delta on Client side was: " + deltaInClientSide;
+					
+					Log.d("gal","round trip is:" + deltaNsRoundTrip);
+					Log.d("gal","air time is:" + airTimeTotal);
+					arrAirTime[counterReceiveData] = "air time is:" + airTimeTotal;
+					arrTotalTime[counterReceiveData] = "round trip is:" + deltaNsRoundTrip;
+					avgAirTime += airTimeTotal;
+					avgTotalRoundTrip += deltaNsRoundTrip;
+					Log.d("gal","counter is " + counterReceiveData);
+					if(counterReceiveData == MAX_RECEIVE)
+					{
+						writeToSdcard();
+						Toast.makeText(this, serverText , Toast.LENGTH_SHORT).show();
+					    counterReceiveData = 0;
+					}
+					counterReceiveData++;
+					//state = 2;
+					break;
+
+				}
+			}
+		}
+		else // CLIENT SIDE: 
+		{
+			switch(state)
+			{
+				case 0:
+
+				{// received first sync message. receiveTime should contain time T1 (when T0 message was received) 	
+
+					sendTime=getTime();
+ 					long deltaInsideClient = sendTime - receiveTime;
+					
+					commHandler.writeToRmoteDevice(deltaInsideClient);
+					Long tDelta = sendTime - receiveTime;
+					commHandler.writeToRmoteDevice(tDelta);
+					String clientText = "sent in Client the delta: " + tDelta + 
+							" and tSend, tReceive were: " + sendTime + " , " + receiveTime;
+					Log.d("gal", "sent message to server in time:  " + String.valueOf(sendTime));
+
+					//Toast.makeText(this, clientText , Toast.LENGTH_SHORT).show();
+					break;
+
+				}
+				case 1: 
+				{
+					Log.d("gal","is client" + String.valueOf(state));
+					break;
+
+				}
+			}
+		}
 	}
 }

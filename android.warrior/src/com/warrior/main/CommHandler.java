@@ -1,17 +1,8 @@
 package com.warrior.main;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintStream;
-
-
 import android.bluetooth.BluetoothSocket;
 import android.os.AsyncTask;
 import android.util.Log;
@@ -20,13 +11,15 @@ import android.widget.Toast;
 public class CommHandler extends AsyncTask<Void, Long, Void>{
 
 	private MainActivity main;
-	BluetoothSocket socket;
-	DataInputStream inStream;
-	DataOutputStream outStream;
+	private BluetoothSocket socket;
+	private DataInputStream inStream;
+	private DataOutputStream outStream;
+	public final static long DISCONNECTED = 100;
+	private IDataRecevie iDataRecevie;
+	
 	public CommHandler(MainActivity main,BluetoothSocket socket) throws IOException
 	{
-		 //System.nanoTime()
-		 this.main = main;
+		this.main = main;
 		this.socket = socket;
 		inStream = new DataInputStream(socket.getInputStream());
 		outStream = new DataOutputStream(socket.getOutputStream());
@@ -43,16 +36,39 @@ public class CommHandler extends AsyncTask<Void, Long, Void>{
 	}
 	public void closeConnection() throws IOException
 	{
-		socket.close();
+		this.cancel(true);
+		if(inStream != null)
+		{
+			inStream.close();
+			inStream = null;
+			
+		}
+		if(outStream != null)
+		{
+			outStream.close();
+			outStream = null;
+		}
+		if(socket != null)
+		{
+			socket.close();
+			socket = null;
+		}
+		System.gc();
 	}
 	protected Void doInBackground(Void... obj) {
 		while (!isCancelled()) {
 			try {
 				Long receiveValue = inStream.readLong();
 				main.setReceiveTime(main.getTime());
+				if(receiveValue == DISCONNECTED)
+				{
+					writeToRmoteDevice(DISCONNECTED);
+					this.closeConnection();
+					break;
+				}
+				
 				Log.d("gal", "received message in time:  " + String.valueOf(main.getReceiveTime()));
 				Log.d("gal","received message is: " + String.valueOf(receiveValue));
-
 				publishProgress(receiveValue);
 			} catch (IOException e) {
 				Log.d("gal",e.getMessage());
@@ -63,6 +79,13 @@ public class CommHandler extends AsyncTask<Void, Long, Void>{
 		return null;
 	}
 	protected void onProgressUpdate(Long... values) {
-		main.dataReceive(values[0]);
+		iDataRecevie.dataRecevie(values[0]);
+	}
+	public interface IDataRecevie {
+		void dataRecevie(long data);
+	}
+	public void setListenerDataRecevie(IDataRecevie iDataRecevie)
+	{
+		this.iDataRecevie = iDataRecevie;
 	}
 }

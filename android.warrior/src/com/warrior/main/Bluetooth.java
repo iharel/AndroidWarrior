@@ -35,7 +35,7 @@ public class Bluetooth {
 	}
 	public void enableBluetooth()
 	{
-		Intent iEnableBluetooth = new Intent(btAdapter.ACTION_REQUEST_DISCOVERABLE);
+		Intent iEnableBluetooth = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
 		iEnableBluetooth.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION,ALWAYS_DISCOVERY);
 		context.startActivity(iEnableBluetooth);
 	}
@@ -49,7 +49,10 @@ public class Bluetooth {
 	}
 	public void startScanning()
 	{
-		btAdapter.startDiscovery();
+		if(!btAdapter.isDiscovering())
+		{
+			btAdapter.startDiscovery();
+		}
 	}
 	public boolean isEnabled()
 	{
@@ -58,40 +61,54 @@ public class Bluetooth {
 	// this is server side
 	public class Server extends AsyncTask<Void, String, Void>
 	{
-		private BluetoothServerSocket serverSocket;
+		private BluetoothServerSocket socket;
 		final static String NAME = "warroir";
+		private IServerClosed serverClosed;
 		public void createListen()throws Exception
 		{
 			if(!btAdapter.isEnabled())
 			{
 				throw new Exception();
 			}
-			serverSocket = btAdapter.listenUsingRfcommWithServiceRecord(NAME, UUID_RFCOMM_GENERIC);
+			socketServer = null;
+			socketServer = null;
+			socket = btAdapter.listenUsingRfcommWithServiceRecord(NAME, UUID_RFCOMM_GENERIC);
 			execute();
 		}
 		protected Void doInBackground(Void... params) {
 			try {
 				publishProgress("the server is open");
-				socketServer = serverSocket.accept(TIME_OUT);
+				socketServer = socket.accept(TIME_OUT);
+				socket = null;
 				if (socketServer != null) {
 					btAdapter.cancelDiscovery();
 				}
 			} catch (IOException e) {
 				publishProgress(e.getMessage());
 				this.cancel(true);
+				serverClosed.serverClosed();
 			}
 			return null;
 		}
 		protected void onProgressUpdate(String... values) {
 			Toast.makeText(context,values[0] ,Toast.LENGTH_SHORT).show();
 		}
+		public void setListenerCloseServer(IServerClosed serverClosed)
+		{
+			this.serverClosed = serverClosed;
+		}
 	}
 	public class Client extends AsyncTask<Void, String, Void>
 	{
 		private BluetoothDevice device;
 		
-		public void connectionToServer(BluetoothDevice device)
+		public void connectionToServer(BluetoothDevice device)throws Exception
 		{
+			if(!btAdapter.isEnabled())
+			{
+				throw new Exception();
+			}
+			socketClient = null;
 			this.device = device;
 			this.execute();
 		}
@@ -132,5 +149,13 @@ public class Bluetooth {
 	public BluetoothSocket getSocketClient()
 	{
 		return socketClient;
+	}
+	public void resetSockets()
+	{
+		socketClient = null;
+		socketServer = null;
+	}
+	interface IServerClosed {
+		void serverClosed();
 	}
 }
