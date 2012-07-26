@@ -10,8 +10,6 @@ import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
-import android.os.Handler;
-import android.util.Log;
 import android.widget.Toast;
 
 public class Bluetooth {
@@ -20,8 +18,8 @@ public class Bluetooth {
 	private final static int ALWAYS_DISCOVERY = 0;
 	private final static UUID UUID_RFCOMM_GENERIC = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 	private final static int TIME_OUT = 20000;
-	private BluetoothSocket socketServer;
-	private BluetoothSocket socketClient; 
+	private BluetoothSocket sSocket;
+	private BluetoothSocket cSocket; 
 
 	public Bluetooth(Context context)
 	{
@@ -35,6 +33,7 @@ public class Bluetooth {
 	}
 	public void enableBluetooth()
 	{
+		// turn on the bluetooth 
 		Intent iEnableBluetooth = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
 		iEnableBluetooth.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION,ALWAYS_DISCOVERY);
 		context.startActivity(iEnableBluetooth);
@@ -59,9 +58,9 @@ public class Bluetooth {
 		return btAdapter.isEnabled();
 	}
 	// this is server side
-	public class Server extends AsyncTask<Void, String, Void>
+	public class Server extends AsyncTask<Void, Void, Void>
 	{
-		private BluetoothServerSocket socket;
+		private BluetoothServerSocket serverSocket;
 		final static String NAME = "warroir";
 		private IServerClosed serverClosed;
 		public void createListen()throws Exception
@@ -70,28 +69,26 @@ public class Bluetooth {
 			{
 				throw new Exception();
 			}
-			socketServer = null;
-			socketServer = null;
-			socket = btAdapter.listenUsingRfcommWithServiceRecord(NAME, UUID_RFCOMM_GENERIC);
+			serverSocket = btAdapter.listenUsingRfcommWithServiceRecord(NAME, UUID_RFCOMM_GENERIC);
 			execute();
 		}
 		protected Void doInBackground(Void... params) {
 			try {
-				publishProgress("the server is open");
-				socketServer = socket.accept(TIME_OUT);
-				socket = null;
-				if (socketServer != null) {
+				// the server wait to connected with time out of 20 sec
+				sSocket = serverSocket.accept(TIME_OUT);
+				serverSocket = null;
+				if (sSocket != null) {
+					// cancel the scanning because is slowly the connection
 					btAdapter.cancelDiscovery();
 				}
 			} catch (IOException e) {
-				publishProgress(e.getMessage());
+				publishProgress();
 				this.cancel(true);
-				serverClosed.serverClosed();
 			}
 			return null;
 		}
-		protected void onProgressUpdate(String... values) {
-			Toast.makeText(context,values[0] ,Toast.LENGTH_SHORT).show();
+		protected void onProgressUpdate(Void... values) {
+			serverClosed.serverClosed();
 		}
 		public void setListenerCloseServer(IServerClosed serverClosed)
 		{
@@ -104,12 +101,8 @@ public class Bluetooth {
 		
 		public void connectionToServer(BluetoothDevice device)throws Exception
 		{
-			if(!btAdapter.isEnabled())
-			{
-				throw new Exception();
-			}
-			socketClient = null;
 			this.device = device;
+			// turn on the new thread  
 			this.execute();
 		}
 		protected Void doInBackground(Void... params) {
@@ -118,10 +111,13 @@ public class Bluetooth {
 				{
 					throw new NullPointerException();
 				}
+				// cancel the scanning because is slowly the connection
 				btAdapter.cancelDiscovery();
-				socketClient = device.createRfcommSocketToServiceRecord(UUID_RFCOMM_GENERIC);
-				socketClient.connect();
+				cSocket = device.createRfcommSocketToServiceRecord(UUID_RFCOMM_GENERIC);
+				cSocket.connect();
 			} catch (IOException e) {
+				publishProgress(e.getMessage());
+			} catch (NullPointerException e) {
 				publishProgress(e.getMessage());
 			}
 			return null;
@@ -130,11 +126,11 @@ public class Bluetooth {
 			Toast.makeText(context,values[0] ,Toast.LENGTH_SHORT).show();
 		}
 	}
-	public Server getCreateServer()
+	public Server createServer()
 	{
 		return new Server();
 	}
-	public Client getCreateClient()
+	public Client createClient()
 	{
 		return new Client();
 	}
@@ -144,16 +140,16 @@ public class Bluetooth {
 	}
 	public BluetoothSocket getSocketServer()
 	{
-		return socketServer;
+		return sSocket;
 	}
 	public BluetoothSocket getSocketClient()
 	{
-		return socketClient;
+		return cSocket;
 	}
 	public void resetSockets()
 	{
-		socketClient = null;
-		socketServer = null;
+		cSocket = null;
+		sSocket = null;
 	}
 	interface IServerClosed {
 		void serverClosed();
