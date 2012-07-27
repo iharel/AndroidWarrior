@@ -11,8 +11,8 @@ import android.util.Log;
 
 public class Sync implements IDataRecevieOfSync {
 	
-	private String[] arrAirTime = new String[MAX_PACKEAGES];
-	private String[] arrTotalTime = new String[MAX_PACKEAGES];
+	private String[] arrAirTime = new String[MAX_PACKEAGES + 1];
+	private String[] arrTotalTime = new String[MAX_PACKEAGES + 1];
 	private long avgAirTime = 0,avgTotalRoundTrip = 0;
 	private ServerSync server;
 	private ClientSync client;
@@ -79,6 +79,7 @@ public class Sync implements IDataRecevieOfSync {
 				case RUNNING: 
 				{
 					
+					counterReceiveData++;
 					long deltaNsRoundTrip = (receiveTime-sendTime);
 					long airTimeTotal = deltaNsRoundTrip - deltaInClientSide;
 
@@ -86,18 +87,15 @@ public class Sync implements IDataRecevieOfSync {
 					arrTotalTime[counterReceiveData] = "round trip is:" + deltaNsRoundTrip;
 					avgAirTime += airTimeTotal;
 					avgTotalRoundTrip += deltaNsRoundTrip;
-					Log.d("gal","the number of package is " + counterReceiveData);
 					if(counterReceiveData >= MAX_RECEIVE_DATA)
 					{
 						writeToSdcard();
 					    counterReceiveData = 0;
-					    commHandler.writeToRmoteDevice(SYNC_FINISH);
+					    commHandler.setIsEndSync(true);
 					    iEndSync.endSync();
-					    break;
 					}
 					sendTime = getTime();
 					commHandler.writeToRmoteDevice(sendTime);
-					counterReceiveData++;
 					break;
 
 				}
@@ -114,6 +112,7 @@ public class Sync implements IDataRecevieOfSync {
 			long receiveTime = values[1];
 			if(counterSendData >= MAX_SEND_DATA)
 			{
+				commHandler.setIsEndSync(true);
 				counterSendData = 0;
 				iEndSync.endSync();
 				return;

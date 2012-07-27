@@ -18,13 +18,17 @@ public class CommHandler extends AsyncTask<Void, Long, Void>{
 	public final static long DISCONNECTED = 100;
 	private IDataRecevieOfGame iDataRecevieOfGame;
 	private IDataRecevieOfSync iDataRecevieOfSync;
-	Sync_State syncState = Sync_State.NOT_START;
+	private boolean isEndSync = false;
 	
 	public CommHandler(BluetoothSocket socket) throws IOException
 	{
 		this.socket = socket;
 		inStream = new DataInputStream(socket.getInputStream());
 		outStream = new DataOutputStream(socket.getOutputStream());
+	}
+	public void setIsEndSync(boolean endSync)
+	{
+		this.isEndSync = endSync;
 	}
 	public void writeToRmoteDevice(Long data) 
 	{
@@ -64,26 +68,20 @@ public class CommHandler extends AsyncTask<Void, Long, Void>{
 		System.gc();
 	}
 	protected Void doInBackground(Void... obj) {
-		switch (syncState) {
-			case NOT_START:
-			{
-				syncState = Sync_State.RUNNING;
-				sync();
-				syncState = Sync_State.FINISH;
-				break;
-			}
-			case FINISH:
-			{
-				new Game().execute();
-				break;
-			}
-		}
+		sync();
+		Log.d("gal","before game start");
+		new Game().execute();
+		Log.d("gal","the end of thread sync");
 		return null;
 	}
 	private void sync()
 	{
 		while (true) {
 			try {
+				if(isEndSync)
+				{
+					return;
+				}
 				Long receiveValue = inStream.readLong();
 				Long receiveTime = Sync.getTime();
 				if(receiveValue == DISCONNECTED)
@@ -92,12 +90,6 @@ public class CommHandler extends AsyncTask<Void, Long, Void>{
 					this.closeConnection();
 					break;
 				}
-				if(receiveValue == Sync.SYNC_FINISH)
-				{
-					publishProgress(receiveValue,receiveTime);
-					break;
-				}
-				
 				publishProgress(receiveValue,receiveTime);
 			} catch (IOException e) {
 				Log.d("gal",e.getMessage());
@@ -108,20 +100,6 @@ public class CommHandler extends AsyncTask<Void, Long, Void>{
 	}
 	protected void onProgressUpdate(Long... values) {
 		iDataRecevieOfSync.dataRecevieOfSync(values);
-		/*
-		switch (syncState) {
-			case RUNNING:
-			{
-				iDataRecevieOfSync.dataRecevieOfSync(values);
-				break;
-			}
-
-			case FINISH:
-			{
-				break;
-			}
-		}*/
-		
 	}
 	class Game extends AsyncTask<Void, Integer, Void>
 	{
@@ -135,7 +113,6 @@ public class CommHandler extends AsyncTask<Void, Long, Void>{
 						closeConnection();
 						break;
 					}
-					
 					publishProgress(receiveValue);
 				} catch (IOException e) {
 					Log.d("gal",e.getMessage());
@@ -146,14 +123,15 @@ public class CommHandler extends AsyncTask<Void, Long, Void>{
 			return null;
 		}
 		protected void onProgressUpdate(Integer... values) {
-			iDataRecevieOfGame.dataRecevie(values[0]);
+			Log.d("gal","the data is:" + values[0]);
+			iDataRecevieOfGame.dataRecevieOfGame(values[0]);
 		}
 		
 	}
 	public interface IDataRecevieOfGame {
-		void dataRecevie(int data);
+		void dataRecevieOfGame(int data);
 	}
-	public void setListenerDataRecevie(IDataRecevieOfGame iDataRecevieOfGame)
+	public void setListenerDataRecevieOfGame(IDataRecevieOfGame iDataRecevieOfGame)
 	{
 		this.iDataRecevieOfGame = iDataRecevieOfGame;
 	}

@@ -1,6 +1,5 @@
 package com.warrior.main;
 
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,6 +109,7 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		{
 			// start sync send first package to client
 			sync.startSync();
+			butSync.setEnabled(false);
 		}
 		else if(v.equals(butOpenServer))
 		{
@@ -183,9 +183,9 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 				    		commHandler = new CommHandler( bt.getSocketClient());
 			    		}
 			    	}
-		    		commHandler.execute();
 		    		sync = new Sync(commHandler, isServer);
 		    		sync.setListenerEndSync(MainActivity.this);
+		    		commHandler.execute();
 		    	 } catch (IOException e) {
 		    			Toast.makeText(context, e.getMessage() + device.getName(), Toast.LENGTH_SHORT).show();
 				 }
@@ -271,10 +271,18 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		Toast.makeText(this, "the sync is finished", Toast.LENGTH_SHORT).show();
 		MyApp app = (MyApp)this.getApplication();
 		app.setCommHndler(commHandler);
-		Intent iGame = new Intent(this,GameActivity.class);
-		iGame.putExtra("timeAir", sync.getTimeAir());
-		iGame.putExtra("isServer", isServer);
-		startActivity(iGame);
-		sync = null;
+		app.setIsServer(isServer);
+		app.setTimeAir(sync.getTimeAir());
+		if(isServer)
+		{
+			Intent iGame = new Intent(this,GameActivityServer.class);
+			startActivity(iGame);
+			butSync.setEnabled(true);
+		}
+		else
+		{
+			Intent iGame = new Intent(this,GameActivityClient.class);
+			startActivity(iGame);
+		}
 	}
 }
