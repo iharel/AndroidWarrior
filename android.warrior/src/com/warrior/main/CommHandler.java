@@ -1,68 +1,145 @@
 package com.warrior.main;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintStream;
-
-
 import android.bluetooth.BluetoothSocket;
 import android.os.AsyncTask;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.util.Log;
 import android.widget.Toast;
 
 public class CommHandler extends AsyncTask<Void, Long, Void>{
 
-	private MainActivity main;
-	BluetoothSocket socket;
-	DataInputStream inStream;
-	DataOutputStream outStream;
-	public CommHandler(MainActivity main,BluetoothSocket socket) throws IOException
+	private BluetoothSocket socket;
+	private DataInputStream inStream;
+	private DataOutputStream outStream;
+	public final static long DISCONNECTED = 100;
+	private IDataRecevieOfGame iDataRecevieOfGame;
+	private IDataRecevieOfSync iDataRecevieOfSync;
+	private boolean isEndSync = false;
+	
+	public CommHandler(BluetoothSocket socket) throws IOException
 	{
-		 //System.nanoTime()
-		 this.main = main;
 		this.socket = socket;
 		inStream = new DataInputStream(socket.getInputStream());
 		outStream = new DataOutputStream(socket.getOutputStream());
 	}
-	public void writeToRmoteDevice(Long data)
+	public void setIsEndSync(boolean endSync)
+	{
+		this.isEndSync = endSync;
+	}
+	public void writeToRmoteDevice(Long data) 
 	{
 		try {
 			outStream.writeLong(data);
-
 		} catch (IOException e) {
-			Toast.makeText(main, e.getMessage(), Toast.LENGTH_SHORT).show();
-			return;
+			Log.d("gal",e.getMessage());
+		}
+	}
+	public void writeToRmoteDevice(int data) 
+	{
+		try {
+			outStream.writeInt(data);
+		} catch (IOException e) {
+			Log.d("gal",e.getMessage());
 		}
 	}
 	public void closeConnection() throws IOException
 	{
-		socket.close();
+		this.cancel(true);
+		if(inStream != null)
+		{
+			inStream.close();
+			inStream = null;
+			
+		}
+		if(outStream != null)
+		{
+			outStream.close();
+			outStream = null;
+		}
+		if(socket != null)
+		{
+			socket.close();
+			socket = null;
+		}
+		System.gc();
 	}
 	protected Void doInBackground(Void... obj) {
-		while (!isCancelled()) {
+		sync();
+		Log.d("gal","before game start");
+		new Game().execute();
+		Log.d("gal","the end of thread sync");
+		return null;
+	}
+	private void sync()
+	{
+		while (true) {
 			try {
+				if(isEndSync)
+				{
+					return;
+				}
 				Long receiveValue = inStream.readLong();
-				main.setReceiveTime(main.getTime());
-				Log.d("gal", "received message in time:  " + String.valueOf(main.getReceiveTime()));
-				Log.d("gal","received message is: " + String.valueOf(receiveValue));
-
-				publishProgress(receiveValue);
+				Long receiveTime = Sync.getTime();
+				if(receiveValue == DISCONNECTED)
+				{
+					writeToRmoteDevice(DISCONNECTED);
+					this.closeConnection();
+					break;
+				}
+				publishProgress(receiveValue,receiveTime);
 			} catch (IOException e) {
 				Log.d("gal",e.getMessage());
 			} catch (Exception e) {
 				Log.d("gal",e.getMessage());
 			}
 		}
-		return null;
 	}
 	protected void onProgressUpdate(Long... values) {
-		main.dataReceive(values[0]);
+		iDataRecevieOfSync.dataRecevieOfSync(values);
+	}
+	class Game extends AsyncTask<Void, Integer, Void>
+	{
+		protected Void doInBackground(Void... arg0) {
+			while (true) {
+				try {
+					int receiveValue = inStream.readInt();
+					if(receiveValue == DISCONNECTED)
+					{
+						writeToRmoteDevice(DISCONNECTED);
+						closeConnection();
+						break;
+					}
+					publishProgress(receiveValue);
+				} catch (IOException e) {
+					Log.d("gal",e.getMessage());
+				} catch (Exception e) {
+					Log.d("gal",e.getMessage());
+				}
+			}
+			return null;
+		}
+		protected void onProgressUpdate(Integer... values) {
+			Log.d("gal","the data is:" + values[0]);
+			iDataRecevieOfGame.dataRecevieOfGame(values[0]);
+		}
+		
+	}
+	public interface IDataRecevieOfGame {
+		void dataRecevieOfGame(int data);
+	}
+	public void setListenerDataRecevieOfGame(IDataRecevieOfGame iDataRecevieOfGame)
+	{
+		this.iDataRecevieOfGame = iDataRecevieOfGame;
+	}
+	public interface IDataRecevieOfSync {
+		void dataRecevieOfSync(Long[] values);
+	}
+	public void setListenerDataRecevieOfSync(IDataRecevieOfSync iDataRecevieOfSync)
+	{
+		this.iDataRecevieOfSync = iDataRecevieOfSync;
 	}
 }

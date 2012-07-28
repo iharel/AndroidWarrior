@@ -5,9 +5,13 @@
     <string name="enable">enable</string>
     <string name="disable">disable</string>
     <string name="close">close</string>
-      <string name="openServer">open server</string>
+    <string name="openServer">open server</string>
     <string name="scan">scan</string>
     <string name="sync">start sync</string>
     <string name="noDevices">no devices to connection</string>
+    <string name="start">start</string>
+    <string name="exit">exit</string>
+    <string name="game1">game1</string>
+    <string name="game2">game2</string>
 
 </resources>

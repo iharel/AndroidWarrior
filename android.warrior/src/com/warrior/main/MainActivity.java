@@ -1,26 +1,19 @@
 package com.warrior.main;
 
-import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.security.Timestamp;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 import android.app.Activity;
+import android.app.Application;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.net.wifi.WifiConfiguration.Status;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Environment;
+import android.provider.SyncStateContract.Constants;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -32,24 +25,22 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.gal.bluetooth1.R;
+import com.androidWarrior.*;
+import com.warrior.main.Bluetooth.IServerClosed;
+import com.warrior.main.Bluetooth.Server;
+import com.warrior.main.Sync.IEndSync;
 
-public class MainActivity extends Activity implements OnClickListener, OnItemClickListener,IDataReceive {
+public class MainActivity extends Activity implements OnClickListener, OnItemClickListener, IEndSync {
 
-	private Button butEnable,butClose,butDisable,butScan,butSync,butOpenServer;
+	private Button butEnable,butDisable,butScan,butSync,butOpenServer;
 	private ListView lv;
 	private Bluetooth bt;
-	private TextView tv;
 	private ArrayAdapter<String> devicesNamesAdapter;
 	private List<BluetoothDevice>devicesList;
 	private boolean isServer = true;
-	private int state = 0;
-	private Long sendTime;
-	private Long receiveTime = (long) 0;
 	private CommHandler commHandler;
+	Sync sync;
 	
-	private int tempCounter = 0;
-	private long[] tempCounterArray = new long[50];
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
@@ -68,12 +59,10 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
     private void buildViewReferece()
     {
     	  butEnable = (Button)findViewById(R.id.butEnable);
-          butClose = (Button)findViewById(R.id.butClose);
           butDisable = (Button)findViewById(R.id.butDisable);
           butScan = (Button)findViewById(R.id.butScan);
           butSync = (Button)findViewById(R.id.butSync);
           butOpenServer = (Button)findViewById(R.id.butOpenServer);
-          tv = (TextView)findViewById(R.id.tv);
           lv = (ListView)findViewById(R.id.lv);
           lv.setEmptyView((TextView)findViewById(R.id.tvEmpty));
     }
@@ -82,19 +71,20 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
     	IntentFilter iDeviceFound = new IntentFilter(BluetoothDevice.ACTION_FOUND);
   		IntentFilter iConnectedBluetooth = new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED);
   		IntentFilter iDisConnectedBluetooth = new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-  		IntentFilter iStateBluetoothChanged = new IntentFilter(bt.getInstanceAdapter().ACTION_STATE_CHANGED);
-  		IntentFilter iDiscoveryFinished = new IntentFilter(bt.getInstanceAdapter().ACTION_DISCOVERY_FINISHED);
+  		IntentFilter iStateBluetoothChanged = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+  		IntentFilter iDiscoveryFinished = new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+  		IntentFilter iDiscoveryStarted = new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
   		registerReceiver(ReceiverBluetooth, iDeviceFound); 
   		registerReceiver(ReceiverBluetooth, iConnectedBluetooth);
   		registerReceiver(ReceiverBluetooth, iDisConnectedBluetooth);
   		registerReceiver(ReceiverBluetooth, iStateBluetoothChanged);
   		registerReceiver(ReceiverBluetooth, iDiscoveryFinished);
+  		registerReceiver(ReceiverBluetooth, iDiscoveryStarted);
     }
     private void BuildEvents()
     {
     	   lv.setOnItemClickListener(this);
            butEnable.setOnClickListener(this);
-           butClose.setOnClickListener(this);
            butDisable.setOnClickListener(this);
            butScan.setOnClickListener(this);
            butSync.setOnClickListener(this);
@@ -109,40 +99,36 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		{
 			bt.disableBluetooth();
 		}
-		else if(v.equals(butClose))
-		{
-			try {
-				commHandler.closeConnection();
-			} catch (IOException e) {
-				Log.d("gal",e.getMessage());
-			}
-		}
 		else if(v.equals(butScan))
 		{
+			// the bluetooth is start scanning 
 			bt.startScanning();
 			devicesNamesAdapter.clear();
-			Toast.makeText(this,"the bluetooth is scanning",Toast.LENGTH_SHORT).show();
 		}
 		else if(v.equals(butSync))
 		{
-			if (isServer)
-			{
-				for (int i = 0; i<50; i++)
-				{
-					sendTime = getTime();
-					commHandler.writeToRmoteDevice(sendTime);
-					Log.d("gal","time server sends data in iteration: " + i + " : " + sendTime);
-					state = 1; // sent T0 to client device
-				}
-			}
+			// start sync send first package to client
+			sync.startSync();
+			butSync.setEnabled(false);
 		}
 		else if(v.equals(butOpenServer))
 		{
 			try {
-				bt.getCreateServer().createListen();
+				butOpenServer.setEnabled(false);
+				// create server
+				Server server = bt.createServer();
+				// create listen 
+				server.setListenerCloseServer(new IServerClosed() {
+					public void serverClosed() {
+						butOpenServer.setEnabled(true);
+						Toast.makeText(MainActivity.this, "the server is closed", Toast.LENGTH_SHORT).show();
+					}
+				});
+				// the server is open and wait to connect in new thread
+				server.createListen();
+				Toast.makeText(MainActivity.this, "the server is open", Toast.LENGTH_SHORT).show();
 			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
 			}
 		}
 	}
@@ -152,165 +138,119 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 	}
 	// this is turn on the client side
 	public void onItemClick(AdapterView<?> adapter, View v, int position, long id) {
-		isServer = false;
-		bt.getCreateClient().connectionToServer(devicesList.get(position));
+		try {
+			isServer = false;
+			// try to connect to server in new thread 
+			// we need to pass to client the device we want to connect
+			bt.createClient().connectionToServer(devicesList.get(position));
+		} catch (Exception e) {
+			Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
+		}
 	}
 	// Create a BroadcastReceiver
 	private final BroadcastReceiver ReceiverBluetooth = new BroadcastReceiver() {
 		public void onReceive(Context context, Intent intent) {
 			String action = intent.getAction();
 		    if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+		    	// the bluetooth found other device
 		        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+		        // add the device to list of devices
 		        devicesList.add(device);
+		        // show the device found on activity
 		        devicesNamesAdapter.add(device.getName() + "\n" + device.getAddress());
 		        lv.setAdapter(devicesNamesAdapter);
 		    }
 		    
 		    else if(BluetoothDevice.ACTION_ACL_CONNECTED.equals(action))
 		    {
+		    	// the bluetooth is connected to other device
 		    	BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-		    	Toast.makeText(context, "you connected to " + device.getName(), Toast.LENGTH_SHORT).show();
-		    	 try {
-			    	if(isServer)
+		    	try {
+		    		if(isServer)
 			    	{
-			    		while(bt.getSocketServer() == null){}
-			    		commHandler = new CommHandler(MainActivity.this, bt.getSocketServer());
-			    		commHandler.execute();
-			    		butSync.setEnabled(true);
+			    		if(commHandler == null)
+			    		{
+			    			// wait socket of server different from null
+				    		while(bt.getSocketServer() == null){}
+				    		commHandler = new CommHandler(bt.getSocketServer());
+				    		butSync.setEnabled(true);
+			    		}
 			    	}
 			    	else
 			    	{
-			    		commHandler = new CommHandler(MainActivity.this, bt.getSocketClient());
-			    		commHandler.execute();
+			    		if(commHandler == null)
+			    		{
+				    		commHandler = new CommHandler( bt.getSocketClient());
+			    		}
 			    	}
+		    		sync = new Sync(commHandler, isServer);
+		    		sync.setListenerEndSync(MainActivity.this);
+		    		commHandler.execute();
 		    	 } catch (IOException e) {
 		    			Toast.makeText(context, e.getMessage() + device.getName(), Toast.LENGTH_SHORT).show();
-				}
+				 }
+		    	
+			    Toast.makeText(context, "you connected to " + device.getName(), Toast.LENGTH_SHORT).show();
 		    	buttonsForBtConnected();
 			   	devicesNamesAdapter.clear();
 		    }
 		    else if(BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action))
 		    {
+		    	// the bluetooth is disconnected from other device
+		    	// clean the socket
+		    	commHandler = null;
+		    	bt.resetSockets();
+		    	bt = null;
+		    	System.gc();
+		    	bt = new Bluetooth(MainActivity.this);
 		    	Toast.makeText(context,"the connection is closed",Toast.LENGTH_SHORT).show();
 		    	buttonsForBtEnabled();
 		    	devicesNamesAdapter.clear();
 		    }
-		    else if(bt.getInstanceAdapter().ACTION_STATE_CHANGED.equals(action))
+		   
+		    else if(BluetoothAdapter.ACTION_STATE_CHANGED.equals(action))
 		    {
-		    	if(bt.isEnabled())
-		    	{
-		    		buttonsForBtEnabled();
-		    		Toast.makeText(context,"the bluetooth is enable",Toast.LENGTH_SHORT).show();
-		    	}
-		    	else if(!bt.isEnabled())
-		    	{
-		    		buttonsForBtDisabled();
-		    		devicesList.clear();
-		    		Toast.makeText(MainActivity.this,"the bluetooth is disable",Toast.LENGTH_SHORT).show();
-		    	}
+		    	// to bluetooth there are 4 modes
+		    	// turning off, off, turning on, on
+		    	// we use in two state turning off and turning on
+		    	final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
+                        BluetoothAdapter.ERROR);
+		    	switch (state) {
+		            case BluetoothAdapter.STATE_TURNING_OFF:
+		            	buttonsForBtDisabled();
+			    		devicesList.clear();
+			    		// show message the the bluetooth is disable
+			    		Toast.makeText(MainActivity.this,"the bluetooth is disable",Toast.LENGTH_SHORT).show();
+		                break;
+		            case BluetoothAdapter.STATE_TURNING_ON:
+		            	buttonsForBtEnabled();
+		            	// show message the the bluetooth is enable
+			    		Toast.makeText(context,"the bluetooth is enable",Toast.LENGTH_SHORT).show();
+		                break;
+	            }
 		    }
-		    else if(bt.getInstanceAdapter().ACTION_DISCOVERY_FINISHED.equals(action))
+		    else if(BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action))
 			{
-		    	Toast.makeText(context, "the discovery is finished",Toast.LENGTH_SHORT).show();
+		    	// show message the scan is finished
+		    	Toast.makeText(context, "the scan is finished",Toast.LENGTH_SHORT).show();
+		    	butScan.setEnabled(true);
 			}
+		    else if(BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action))
+		    {
+		    	// show message the scan is started
+		    	Toast.makeText(context, "the scan is started",Toast.LENGTH_SHORT).show();
+		    	butScan.setEnabled(false);
+		    }
 		}
 		
 	};
-	public void dataReceive(Long value) {
-		tv.setText(String.valueOf(value));
-		if (isServer)
-		{
-			switch(state)
-			{
-				case 0:
-				{
-					// do nothing. Main activity will send initial time stamp
-					Log.d("gal","is server" + String.valueOf(state));
-					break;
-				}
-				case 1: 
-				{
-					Long deltaInClientSide = value;
-					Long deltaNsRoundTrip = (receiveTime-sendTime);
-					Long airTimeTotal = deltaNsRoundTrip - deltaInClientSide;
-					tempCounterArray[tempCounter] = airTimeTotal;
-					tempCounter++;
-					String serverText = "Delta found by server: " + String.valueOf(airTimeTotal) + 
-							". Delta roundTrip was " + deltaNsRoundTrip + " delta on Client side was: " + deltaInClientSide;
-					Toast.makeText(this, serverText , Toast.LENGTH_SHORT).show();
-					Log.d("gal","round trip is:" + deltaNsRoundTrip);
-					Log.d("gal","air time is:" + airTimeTotal);
-					state = 1;
-					if (tempCounter == 49)
-					{
-						FileWriter fw = null;
-						try {
-				            String fileName = Environment.getExternalStorageDirectory().getAbsolutePath() + "/WarriorTrials/fiftyTrials.txt";
-							Log.d("gal",fileName);
-				            fw = new FileWriter(fileName);
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-							Log.d("gal","WARNING: COULDNT CREATE THE FILE");
-						}
-						BufferedWriter bw =  new BufferedWriter(fw);
-						PrintWriter pOut = new PrintWriter(bw);
-						String line = null;
-						for (int j = 0; j<50; j++) 
-						{
-							pOut.println(tempCounterArray[j]);   //  eventually goes to writeme.txt.
-
-						}
-
-						pOut.flush();
-						pOut.close();
-
-					}
-
-					break;
-					
-
-				}
-			}
-		}
-		else // CLIENT SIDE: 
-		{
-			Log.d("gal", "is client and the state is " + String.valueOf(state));
-			switch(state)
-			{
-				case 0:
-
-				{// received first sync message. receiveTime should contain time T1 (when T0 message was received) 	
-
-					sendTime=getTime();
- 					long deltaInsideClient = sendTime - receiveTime;
-					
-					commHandler.writeToRmoteDevice(deltaInsideClient);
-					Long tDelta = sendTime - receiveTime;
-					commHandler.writeToRmoteDevice(tDelta);
-					String clientText = "sent in Client the delta: " + tDelta + 
-							" and tSend, tReceive were: " + sendTime + " , " + receiveTime;
-					Log.d("gal", "sent message to server in time:  " + String.valueOf(sendTime));
-
-					Toast.makeText(this, clientText , Toast.LENGTH_SHORT).show();
-					break;
-
-				}
-				case 1: 
-				{
-					Log.d("gal","is client" + String.valueOf(state));
-					break;
-
-				}
-			}
-		}
-	}
 	private void buttonsForBtEnabled()
 	{
 		butDisable.setEnabled(true);
 		butScan.setEnabled(true);
 		butOpenServer.setEnabled(true);
 		butEnable.setEnabled(false);
+		butSync.setEnabled(false);
 	}
 	private void buttonsForBtDisabled()
 	{
@@ -318,26 +258,31 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		butDisable.setEnabled(false);
 		butScan.setEnabled(false);
 		butSync.setEnabled(false);
-		butClose.setEnabled(false);
 		butOpenServer.setEnabled(false);
 	}
 	private void buttonsForBtConnected()
 	{
-		butClose.setEnabled(true);
 	    butOpenServer.setEnabled(false);
 	   	butDisable.setEnabled(false);
 	   	butScan.setEnabled(false);
 	}
-	public void setReceiveTime(long time) {
-		// TODO Auto-generated method stub
-		this.receiveTime = time;
-	}
-	public long getReceiveTime() {
-		// TODO Auto-generated method stub
-
-		return this.receiveTime;
-	}
-	public long getTime() {
-		return System.currentTimeMillis();// nanoTime();
+	public void endSync() {
+		// the sync is over the game move to activity game
+		Toast.makeText(this, "the sync is finished", Toast.LENGTH_SHORT).show();
+		MyApp app = (MyApp)this.getApplication();
+		app.setCommHndler(commHandler);
+		app.setIsServer(isServer);
+		app.setTimeAir(sync.getTimeAir());
+		if(isServer)
+		{
+			Intent iGame = new Intent(this,GameActivityServer.class);
+			startActivity(iGame);
+			butSync.setEnabled(true);
+		}
+		else
+		{
+			Intent iGame = new Intent(this,GameActivityClient.class);
+			startActivity(iGame);
+		}
 	}
 }
