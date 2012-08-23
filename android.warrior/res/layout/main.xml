@@ -44,13 +44,6 @@
 	        android:layout_height="wrap_content"
 	        android:text="@string/openServer"
 	        android:enabled="false"/>
-	       
-	       <Button 
-	        android:id="@+id/butSync"
-	        android:layout_width="wrap_content"
-	        android:layout_height="wrap_content"
-	        android:text="@string/sync"
-	        android:enabled="false"/>
     </LinearLayout>
     <ListView 
         android:id="@+id/lv"

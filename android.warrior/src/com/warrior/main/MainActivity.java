@@ -13,7 +13,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
-import android.provider.SyncStateContract.Constants;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -26,42 +25,47 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.androidWarrior.*;
+import com.warrior.games.Game.GAME_STATES;
 import com.warrior.main.Bluetooth.IServerClosed;
 import com.warrior.main.Bluetooth.Server;
-import com.warrior.main.Sync.IEndSync;
+import com.warrior.main.Sync.IFinishSync;
 
-public class MainActivity extends Activity implements OnClickListener, OnItemClickListener, IEndSync {
+public class MainActivity extends Activity implements OnClickListener, OnItemClickListener, IFinishSync {
 
-	private Button butEnable,butDisable,butScan,butSync,butOpenServer;
+	private Button butEnable,butDisable,butScan,butOpenServer;
 	private ListView lv;
 	private Bluetooth bt;
 	private ArrayAdapter<String> devicesNamesAdapter;
 	private List<BluetoothDevice>devicesList;
 	private boolean isServer = true;
 	private CommHandler commHandler;
-	Sync sync;
+	private Sync sync;
+	private final static int RC_SELECT_GAME = 10;
 	
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
-        
         bt = new Bluetooth(this);        
         devicesNamesAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
         devicesList = new ArrayList<BluetoothDevice>();
         buildViewReferece();
         buildIntentFilter();
         BuildEvents();
-        if(bt.isEnabled())
-        {
-        	buttonsForBtEnabled();
-        }
+    }
+    protected void onResume() {
+    	 if(bt.isEnabled()){
+         	buttonsForBtEnabled();
+         }
+    	 else{
+    		 buttonsForBtDisabled();
+    	 }
+    	super.onResume();
     }
     private void buildViewReferece()
     {
     	  butEnable = (Button)findViewById(R.id.butEnable);
           butDisable = (Button)findViewById(R.id.butDisable);
           butScan = (Button)findViewById(R.id.butScan);
-          butSync = (Button)findViewById(R.id.butSync);
           butOpenServer = (Button)findViewById(R.id.butOpenServer);
           lv = (ListView)findViewById(R.id.lv);
           lv.setEmptyView((TextView)findViewById(R.id.tvEmpty));
@@ -87,8 +91,14 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
            butEnable.setOnClickListener(this);
            butDisable.setOnClickListener(this);
            butScan.setOnClickListener(this);
-           butSync.setOnClickListener(this);
            butOpenServer.setOnClickListener(this);
+    }
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    	switch(requestCode){
+    		case RC_SELECT_GAME:{
+    			onClick(butDisable);
+    		}
+    	}
     }
 	public void onClick(View v) {
 		if(v.equals(butEnable))
@@ -97,6 +107,19 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		}	
 		else if(v.equals(butDisable))
 		{
+			if(commHandler != null){
+				if(commHandler.getIsConnected()){
+					
+					try {
+						commHandler.writeToRmoteDevice(CommHandler.DISCONNECTED);
+						Thread.sleep(sync.getTimeAir());
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
+				return;
+			}
 			bt.disableBluetooth();
 		}
 		else if(v.equals(butScan))
@@ -104,12 +127,6 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 			// the bluetooth is start scanning 
 			bt.startScanning();
 			devicesNamesAdapter.clear();
-		}
-		else if(v.equals(butSync))
-		{
-			// start sync send first package to client
-			sync.startSync();
-			butSync.setEnabled(false);
 		}
 		else if(v.equals(butOpenServer))
 		{
@@ -143,6 +160,8 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 			// try to connect to server in new thread 
 			// we need to pass to client the device we want to connect
 			bt.createClient().connectionToServer(devicesList.get(position));
+			Toast.makeText(this, devicesList.get(position).getName() + " and adapter: " + devicesNamesAdapter.getItem(position).toString(), Toast.LENGTH_SHORT).show();
+
 		} catch (Exception e) {
 			Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
 		}
@@ -173,7 +192,6 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 			    			// wait socket of server different from null
 				    		while(bt.getSocketServer() == null){}
 				    		commHandler = new CommHandler(bt.getSocketServer());
-				    		butSync.setEnabled(true);
 			    		}
 			    	}
 			    	else
@@ -184,11 +202,18 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 			    		}
 			    	}
 		    		sync = new Sync(commHandler, isServer);
-		    		sync.setListenerEndSync(MainActivity.this);
-		    		commHandler.execute();
-		    	 } catch (IOException e) {
-		    			Toast.makeText(context, e.getMessage() + device.getName(), Toast.LENGTH_SHORT).show();
+		    		sync.setListenerFinishSync(MainActivity.this);
+		    		commHandler.startReceiveData();
+		    		if(isServer){
+		    			sync.startSync();
+		    		}
+		    	 } 
+		    	 catch (IOException e) {
+		    		Toast.makeText(context, e.getMessage() + device.getName(), Toast.LENGTH_SHORT).show();
 				 }
+		    	 catch (Exception e) {
+		    		 Toast.makeText(context, e.getMessage() + device.getName(), Toast.LENGTH_SHORT).show();
+		    	 }
 		    	
 			    Toast.makeText(context, "you connected to " + device.getName(), Toast.LENGTH_SHORT).show();
 		    	buttonsForBtConnected();
@@ -197,15 +222,17 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		    else if(BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action))
 		    {
 		    	// the bluetooth is disconnected from other device
-		    	// clean the socket
-		    	commHandler = null;
-		    	bt.resetSockets();
-		    	bt = null;
-		    	System.gc();
-		    	bt = new Bluetooth(MainActivity.this);
-		    	Toast.makeText(context,"the connection is closed",Toast.LENGTH_SHORT).show();
-		    	buttonsForBtEnabled();
-		    	devicesNamesAdapter.clear();
+		    	try {
+					commHandler.closeConnection();
+					commHandler = null;
+			    	Toast.makeText(context,"the connection is closed",Toast.LENGTH_SHORT).show();
+			    	buttonsForBtEnabled();
+			    	devicesNamesAdapter.clear();
+			    	bt.disableBluetooth();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 		    }
 		   
 		    else if(BluetoothAdapter.ACTION_STATE_CHANGED.equals(action))
@@ -219,6 +246,7 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		            case BluetoothAdapter.STATE_TURNING_OFF:
 		            	buttonsForBtDisabled();
 			    		devicesList.clear();
+			    		devicesNamesAdapter.clear();
 			    		// show message the the bluetooth is disable
 			    		Toast.makeText(MainActivity.this,"the bluetooth is disable",Toast.LENGTH_SHORT).show();
 		                break;
@@ -250,39 +278,29 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 		butScan.setEnabled(true);
 		butOpenServer.setEnabled(true);
 		butEnable.setEnabled(false);
-		butSync.setEnabled(false);
 	}
 	private void buttonsForBtDisabled()
 	{
 		butEnable.setEnabled(true);
 		butDisable.setEnabled(false);
 		butScan.setEnabled(false);
-		butSync.setEnabled(false);
 		butOpenServer.setEnabled(false);
 	}
 	private void buttonsForBtConnected()
 	{
 	    butOpenServer.setEnabled(false);
-	   	butDisable.setEnabled(false);
 	   	butScan.setEnabled(false);
 	}
-	public void endSync() {
+	public void finishSync() {
 		// the sync is over the game move to activity game
 		Toast.makeText(this, "the sync is finished", Toast.LENGTH_SHORT).show();
 		MyApp app = (MyApp)this.getApplication();
 		app.setCommHndler(commHandler);
 		app.setIsServer(isServer);
 		app.setTimeAir(sync.getTimeAir());
-		if(isServer)
-		{
-			Intent iGame = new Intent(this,GameActivityServer.class);
-			startActivity(iGame);
-			butSync.setEnabled(true);
-		}
-		else
-		{
-			Intent iGame = new Intent(this,GameActivityClient.class);
-			startActivity(iGame);
-		}
+		commHandler.setStateGame(GAME_STATES.NOT_YET);
+		Intent iSelectGame = new Intent(this,SelectGameActivity.class);
+		startActivityForResult(iSelectGame, RC_SELECT_GAME);
+		sync.resetSync();
 	}
 }

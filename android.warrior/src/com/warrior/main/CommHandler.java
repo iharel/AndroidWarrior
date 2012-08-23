@@ -3,6 +3,9 @@ package com.warrior.main;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+
+import com.warrior.games.Game.GAME_STATES;
+
 import android.bluetooth.BluetoothSocket;
 import android.os.AsyncTask;
 import android.os.Parcel;
@@ -10,45 +13,48 @@ import android.os.Parcelable;
 import android.util.Log;
 import android.widget.Toast;
 
-public class CommHandler extends AsyncTask<Void, Long, Void>{
+public class CommHandler{
 
 	private BluetoothSocket socket;
 	private DataInputStream inStream;
 	private DataOutputStream outStream;
-	public final static long DISCONNECTED = 100;
-	private IDataRecevieOfGame iDataRecevieOfGame;
-	private IDataRecevieOfSync iDataRecevieOfSync;
-	private boolean isEndSync = false;
+	private IDataRecevieGame iDataRecevieGame;
+	private IDataRecevieSync iDataRecevieSync;
+	private GAME_STATES state;
+	private boolean isConnected = false;
+	public final static long DISCONNECTED = 1000;
 	
 	public CommHandler(BluetoothSocket socket) throws IOException
 	{
 		this.socket = socket;
 		inStream = new DataInputStream(socket.getInputStream());
 		outStream = new DataOutputStream(socket.getOutputStream());
+		state = GAME_STATES.SYNC;
+		isConnected = true;
 	}
-	public void setIsEndSync(boolean endSync)
-	{
-		this.isEndSync = endSync;
+	public boolean getIsConnected(){
+		return isConnected;
+	}
+	public void setStateGame(GAME_STATES state){
+		this.state = state;
 	}
 	public void writeToRmoteDevice(Long data) 
 	{
 		try {
 			outStream.writeLong(data);
+			outStream.flush();
+			Log.d("gal","send data: " + data);
+
 		} catch (IOException e) {
 			Log.d("gal",e.getMessage());
-		}
-	}
-	public void writeToRmoteDevice(int data) 
-	{
-		try {
-			outStream.writeInt(data);
-		} catch (IOException e) {
+		} catch (NullPointerException e) {
 			Log.d("gal",e.getMessage());
 		}
+	
 	}
 	public void closeConnection() throws IOException
 	{
-		this.cancel(true);
+		Log.d("gal","into connection close");
 		if(inStream != null)
 		{
 			inStream.close();
@@ -65,81 +71,84 @@ public class CommHandler extends AsyncTask<Void, Long, Void>{
 			socket.close();
 			socket = null;
 		}
-		System.gc();
+		isConnected = false;
 	}
-	protected Void doInBackground(Void... obj) {
-		sync();
-		Log.d("gal","before game start");
-		new Game().execute();
-		Log.d("gal","the end of thread sync");
-		return null;
-	}
-	private void sync()
+	public void startReceiveData()
 	{
-		while (true) {
-			try {
-				if(isEndSync)
-				{
-					return;
+		new ReceiveData().execute();
+	}
+	class ReceiveData extends AsyncTask<Void, Long, Void>{
+
+		protected Void doInBackground(Void... params) {
+			Long receiveValue,receiveTime;
+			while (isConnected) {
+				try {
+					receiveValue = inStream.readLong();
+					receiveTime = Sync.getSystemTime();
+					publishProgress(receiveValue,receiveTime);
+					Log.d("gal","the receiveValue is:" + receiveValue);
+				 } catch (IOException e) {
+					Log.d("gal",e.getMessage());
 				}
-				Long receiveValue = inStream.readLong();
-				Long receiveTime = Sync.getTime();
-				if(receiveValue == DISCONNECTED)
-				{
-					writeToRmoteDevice(DISCONNECTED);
-					this.closeConnection();
-					break;
-				}
-				publishProgress(receiveValue,receiveTime);
-			} catch (IOException e) {
-				Log.d("gal",e.getMessage());
+			}
+			try{
+				closeConnection();
 			} catch (Exception e) {
 				Log.d("gal",e.getMessage());
 			}
-		}
-	}
-	protected void onProgressUpdate(Long... values) {
-		iDataRecevieOfSync.dataRecevieOfSync(values);
-	}
-	class Game extends AsyncTask<Void, Integer, Void>
-	{
-		protected Void doInBackground(Void... arg0) {
-			while (true) {
-				try {
-					int receiveValue = inStream.readInt();
-					if(receiveValue == DISCONNECTED)
-					{
-						writeToRmoteDevice(DISCONNECTED);
-						closeConnection();
-						break;
-					}
-					publishProgress(receiveValue);
-				} catch (IOException e) {
-					Log.d("gal",e.getMessage());
-				} catch (Exception e) {
-					Log.d("gal",e.getMessage());
-				}
-			}
 			return null;
 		}
-		protected void onProgressUpdate(Integer... values) {
-			Log.d("gal","the data is:" + values[0]);
-			iDataRecevieOfGame.dataRecevieOfGame(values[0]);
+		protected void onProgressUpdate(Long... values) {
+			long receiveValue = values[0];
+			if(receiveValue == DISCONNECTED)
+			{
+				CommHandler.this.writeToRmoteDevice(DISCONNECTED);
+				isConnected = false;
+				return;
+			}
+			switch(state){
+				case SYNC:{
+					iDataRecevieSync.dataRecevieSync(values);
+					break;
+				}
+				case NOT_YET:{
+					iDataRecevieGame.dataReceiveBeforeGame(receiveValue);
+					Log.d("gal","in following state: NOT_YET" );
+					break;
+				}
+				case RUNNING:{
+					iDataRecevieGame.dataRecevieInGame(receiveValue);
+					Log.d("gal","in following state: RUNNING" );
+					break;
+				}
+				case FINISHED:{
+					iDataRecevieGame.dataRecevieFinishGame(receiveValue);
+					Log.d("gal","in following state: FINISHED" );
+					break;
+				}
+			}
+			
 		}
-		
 	}
-	public interface IDataRecevieOfGame {
-		void dataRecevieOfGame(int data);
+	public interface IDataRecevieSync {
+		void dataRecevieSync(Long[] values);
 	}
-	public void setListenerDataRecevieOfGame(IDataRecevieOfGame iDataRecevieOfGame)
+	public void setListenerDataRecevieSync(IDataRecevieSync iDataRecevieSync)
 	{
-		this.iDataRecevieOfGame = iDataRecevieOfGame;
+		this.iDataRecevieSync = iDataRecevieSync;
 	}
-	public interface IDataRecevieOfSync {
-		void dataRecevieOfSync(Long[] values);
+	
+	public interface IDataRecevieGame {
+		void dataReceiveBeforeGame(long data);
+		void dataRecevieInGame(long data);
+		void dataRecevieFinishGame(long data);
 	}
-	public void setListenerDataRecevieOfSync(IDataRecevieOfSync iDataRecevieOfSync)
+	public void setListenerDataRecevieGame(IDataRecevieGame iDataRecevieGame)
 	{
-		this.iDataRecevieOfSync = iDataRecevieOfSync;
+		this.iDataRecevieGame = iDataRecevieGame;
+	}
+	public GAME_STATES getStateGame() {
+		// TODO Auto-generated method stub
+		return this.state;
 	}
 }

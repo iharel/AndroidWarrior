@@ -5,11 +5,13 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
-import com.warrior.main.CommHandler.IDataRecevieOfSync;
+import java.util.Calendar;
+
+import com.warrior.main.CommHandler.IDataRecevieSync;
 import android.os.Environment;
 import android.util.Log;
 
-public class Sync implements IDataRecevieOfSync {
+public class Sync implements IDataRecevieSync {
 	
 	private String[] arrAirTime = new String[MAX_PACKEAGES + 1];
 	private String[] arrTotalTime = new String[MAX_PACKEAGES + 1];
@@ -18,9 +20,10 @@ public class Sync implements IDataRecevieOfSync {
 	private ClientSync client;
 	private boolean isServer;
 	private CommHandler commHandler;
-	private final static int MAX_PACKEAGES = 200;
+	private final static int MAX_PACKEAGES = 50;
 	public final static long SYNC_FINISH = 101;
-	private IEndSync iEndSync;
+	private IFinishSync iFinishSync;
+	private long timeAir;
 	
 	public Sync(CommHandler commHandler, boolean isServer)
 	{
@@ -28,18 +31,26 @@ public class Sync implements IDataRecevieOfSync {
 		this.isServer = isServer;
 		server = new ServerSync();
 		client = new ClientSync();
-		commHandler.setListenerDataRecevieOfSync(this);
+		commHandler.setListenerDataRecevieSync(this);
 	}
 	
 	public void startSync()
 	{
 		server.serverStartSync();
 	}
-	public static long getTime()
+	public static long getSystemTime()
 	{
 		return System.currentTimeMillis();
 	}
-	public void dataRecevieOfSync(Long[] values) {
+	public static String getDateTime()
+	{
+		return " date: " + Calendar.getInstance().getTime().toString();
+	}
+	public long getTimeAir()
+	{
+		return timeAir; 
+	}
+	public void dataRecevieSync(Long[] values) {
 		if(isServer)
 		{
 			server.syncRunning(values);
@@ -61,7 +72,7 @@ public class Sync implements IDataRecevieOfSync {
 		{
 			// send the first package to client
 			syncState = Sync_State.RUNNING;
-			sendTime = getTime();
+			sendTime = getSystemTime();
 			commHandler.writeToRmoteDevice(sendTime);
 		}
 		
@@ -78,23 +89,20 @@ public class Sync implements IDataRecevieOfSync {
 				}
 				case RUNNING: 
 				{
-					
 					counterReceiveData++;
 					long deltaNsRoundTrip = (receiveTime-sendTime);
 					long airTimeTotal = deltaNsRoundTrip - deltaInClientSide;
-
 					arrAirTime[counterReceiveData] = "air time is:" + airTimeTotal;
 					arrTotalTime[counterReceiveData] = "round trip is:" + deltaNsRoundTrip;
 					avgAirTime += airTimeTotal;
 					avgTotalRoundTrip += deltaNsRoundTrip;
 					if(counterReceiveData >= MAX_RECEIVE_DATA)
 					{
-						writeToSdcard();
-					    counterReceiveData = 0;
-					    commHandler.setIsEndSync(true);
-					    iEndSync.endSync();
+						writeResultSync();
+						iFinishSync.finishSync();
+						timeAir = (avgAirTime/(MAX_PACKEAGES*2));
 					}
-					sendTime = getTime();
+					sendTime = getSystemTime();
 					commHandler.writeToRmoteDevice(sendTime);
 					break;
 
@@ -112,20 +120,27 @@ public class Sync implements IDataRecevieOfSync {
 			long receiveTime = values[1];
 			if(counterSendData >= MAX_SEND_DATA)
 			{
-				commHandler.setIsEndSync(true);
-				counterSendData = 0;
-				iEndSync.endSync();
+				timeAir = (avgAirTime/(MAX_PACKEAGES/2));
+				iFinishSync.finishSync();
 				return;
 			}
-			long sendTime=getTime();
+			long sendTime=getSystemTime();
 			long deltaInsideClient = sendTime - receiveTime;
 			commHandler.writeToRmoteDevice(deltaInsideClient);
 			counterSendData++;
 		}
 	}
-	private void writeToSdcard()
+	public void resetSync()
 	{
-		String filename = "Results.txt";
+		server.counterReceiveData = 0;
+		server.syncState = Sync_State.NOT_START;
+		client.counterSendData = 0;
+		avgAirTime = 0;
+		avgTotalRoundTrip = 0;
+	}
+	private void writeResultSync()
+	{
+		String filename = "SyncResults.txt";
 		File file = new File(Environment.getExternalStorageDirectory(), filename);
 		try {
 		    PrintWriter pw = new PrintWriter(new FileOutputStream(file));
@@ -145,31 +160,27 @@ public class Sync implements IDataRecevieOfSync {
 		} catch (FileNotFoundException e) {
 		    try {
 				file.createNewFile();
-				writeToSdcard();
+				writeResultSync();
 			} catch (IOException e1) {
 				Log.d("gal",e.getMessage());
 				e1.printStackTrace();
 			}
 		}
 	}
-	public long getTimeAir()
+	interface IFinishSync
 	{
-		long airTime = (avgAirTime/MAX_PACKEAGES/2); 
-		return airTime;
+		void finishSync();
 	}
-	interface IEndSync
+	public void setListenerFinishSync(IFinishSync iFinishSync)
 	{
-		void endSync();
+		this.iFinishSync = iFinishSync;
 	}
-	public void setListenerEndSync(IEndSync iEndSync)
+	private enum Sync_State
 	{
-		this.iEndSync = iEndSync;
+		NOT_START,
+		RUNNING,
+		FINISH
 	}
 }
-enum Sync_State
-{
-	NOT_START,
-	RUNNING,
-	FINISH
-}
+
 
