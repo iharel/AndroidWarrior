@@ -110,7 +110,7 @@ public class BluetoothHandler {
 	{
 		private BluetoothDevice device;
 		
-		public void connectionToServer(BluetoothDevice device)throws Exception
+		public void connectToServer(BluetoothDevice device)throws Exception
 		{
 			this.device = device;
 			// turn on the new thread  

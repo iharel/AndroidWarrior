@@ -161,7 +161,9 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 			isServer = false;
 			// try to connect to server in new thread 
 			// we need to pass to client the device we want to connect
-			bt.createClient().connectionToServer(devicesList.get(position));
+			
+			
+			bt.createClient().connectToServer(devicesList.get(position));
 			Toast.makeText(this, devicesList.get(position).getName() + " and adapter: " + devicesNamesAdapter.getItem(position).toString(), Toast.LENGTH_SHORT).show();
 
 		} catch (Exception e) {
@@ -194,12 +196,34 @@ public class MainActivity extends Activity implements OnClickListener, OnItemCli
 			    			// wait socket of server different from null
 				    		while(bt.getServerSocket() == null){}
 				    		commHandler = new CommHandler(bt.getServerSocket());
+							//iharel: adding to this section the server initiating logic
+				    		try {
+								butOpenServer.setEnabled(false);
+								// create server
+								BluetoothServerThread server = bt.createServer();
+								// create listen 
+								server.setListenerCloseServer(new IServerClosed() {
+									public void serverClosed() {
+										butOpenServer.setEnabled(true);
+										Toast.makeText(MainActivity.this, "the server is closed", Toast.LENGTH_SHORT).show();
+									}
+								});
+								// the server is open and wait to connect in new thread
+								server.createListeningSocket();
+							
+								Toast.makeText(MainActivity.this, "the server is open", Toast.LENGTH_SHORT).show();
+							} catch (Exception e) {
+								Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
+							}
+
 			    		}
 			    	}
 			    	else
 			    	{
 			    		if(commHandler == null)
 			    		{
+				    		while(bt.getClientSocket() == null){}
+				    		// iharel: is the upper line necessary?
 				    		commHandler = new CommHandler( bt.getClientSocket());
 			    		}
 			    	}
