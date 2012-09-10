@@ -18,8 +18,8 @@ public class CommHandler{
 	private BluetoothSocket socket;
 	private DataInputStream inStream;
 	private DataOutputStream outStream;
-	private IDataRecevieGame iDataRecevieGame;
-	private IDataRecevieSync iDataRecevieSync;
+	private IDataRecevieGame iDataReceiveGame;
+	private IDataReceiveSync iDataRecevieSync;
 	private GAME_STATES state;
 	private boolean isConnected = false;
 	public final static long DISCONNECTED = 1000;
@@ -112,17 +112,17 @@ public class CommHandler{
 					break;
 				}
 				case NOT_YET:{
-					iDataRecevieGame.dataReceiveBeforeGame(receiveValue);
+					iDataReceiveGame.dataReceiveBeforeGame(receiveValue);
 					Log.d("gal","in following state: NOT_YET" );
 					break;
 				}
 				case RUNNING:{
-					iDataRecevieGame.dataRecevieInGame(receiveValue);
+					iDataReceiveGame.dataRecevieInGame(receiveValue);
 					Log.d("gal","in following state: RUNNING" );
 					break;
 				}
 				case FINISHED:{
-					iDataRecevieGame.dataRecevieFinishGame(receiveValue);
+					iDataReceiveGame.dataRecevieFinishGame(receiveValue);
 					Log.d("gal","in following state: FINISHED" );
 					break;
 				}
@@ -130,25 +130,26 @@ public class CommHandler{
 			
 		}
 	}
-	public interface IDataRecevieSync {
-		void dataRecevieSync(Long[] values);
-	}
-	public void setListenerDataRecevieSync(IDataRecevieSync iDataRecevieSync)
-	{
-		this.iDataRecevieSync = iDataRecevieSync;
-	}
 	
+	public void setListenerDataRecevieSync(IDataReceiveSync iDataReceiveSync)
+	{
+		this.iDataRecevieSync = iDataReceiveSync;
+	}
+	public void setListenerDataRecevieGame(IDataRecevieGame iDataRecieveGame)
+	{
+		this.iDataReceiveGame = iDataRecieveGame;
+	}
+	public GAME_STATES getStateGame() {
+		// TODO Auto-generated method stub
+		return this.state;
+	}	
+	public interface IDataReceiveSync {
+		void dataRecevieSync(Long[] values);
+	}	
 	public interface IDataRecevieGame {
 		void dataReceiveBeforeGame(long data);
 		void dataRecevieInGame(long data);
 		void dataRecevieFinishGame(long data);
 	}
-	public void setListenerDataRecevieGame(IDataRecevieGame iDataRecevieGame)
-	{
-		this.iDataRecevieGame = iDataRecevieGame;
-	}
-	public GAME_STATES getStateGame() {
-		// TODO Auto-generated method stub
-		return this.state;
-	}
+	
 }

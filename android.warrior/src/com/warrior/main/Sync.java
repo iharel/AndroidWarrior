@@ -7,11 +7,11 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Calendar;
 
-import com.warrior.main.CommHandler.IDataRecevieSync;
+import com.warrior.main.CommHandler.IDataReceiveSync;
 import android.os.Environment;
 import android.util.Log;
 
-public class Sync implements IDataRecevieSync {
+public class Sync implements IDataReceiveSync {
 	
 	private String[] arrAirTime = new String[MAX_PACKEAGES + 1];
 	private String[] arrTotalTime = new String[MAX_PACKEAGES + 1];

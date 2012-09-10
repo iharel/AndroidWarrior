@@ -12,7 +12,7 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.widget.Toast;
 
-public class Bluetooth {
+public class BluetoothHandler {
 	private BluetoothAdapter btAdapter;
 	private Context context;
 	private final static int ALWAYS_DISCOVERY = 0;
@@ -21,22 +21,32 @@ public class Bluetooth {
 	private BluetoothSocket sSocket;
 	private BluetoothSocket cSocket; 
 
-	public Bluetooth(Context context)
+	public BluetoothHandler(Context context)
 	{
 		this.context = context;
 		btAdapter= BluetoothAdapter.getDefaultAdapter();
 
 		if(btAdapter == null)
 		{
-			// the device is not support in bluetooth
+			// TODO: the device is not support in bluetooth
 		}
 	}
 	public void enableBluetooth()
 	{
 		// turn on the bluetooth 
-		Intent iEnableBluetooth = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
-		iEnableBluetooth.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION,ALWAYS_DISCOVERY);
-		context.startActivity(iEnableBluetooth);
+		if (!btAdapter.isEnabled())
+		{
+
+			// Enabling bluetooth + making phone discoverable: 
+			Intent iEnableBluetooth = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+			iEnableBluetooth.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION,ALWAYS_DISCOVERY);
+			context.startActivity(iEnableBluetooth);
+			// We could easily use: btAdapter.enable(); but not recommended.
+		}
+	}
+	public void onActivityResult(int requestCode, int resultCode, Intent data)
+	{
+		
 	}
 	public void disableBluetooth()
 	{
@@ -48,7 +58,7 @@ public class Bluetooth {
 	}
 	public void startScanning()
 	{
-		if(!btAdapter.isDiscovering())
+		if((btAdapter.isEnabled()) && (!btAdapter.isDiscovering()))
 		{
 			btAdapter.startDiscovery();
 		}
@@ -58,12 +68,12 @@ public class Bluetooth {
 		return btAdapter.isEnabled();
 	}
 	// this is server side
-	public class Server extends AsyncTask<Void, Void, Void>
+	public class BluetoothServerThread extends AsyncTask<Void, Void, Void>
 	{
 		private BluetoothServerSocket serverSocket;
-		final static String NAME = "warroir";
+		final static String NAME = "warrior";
 		private IServerClosed serverClosed;
-		public void createListen()throws Exception
+		public void createListeningSocket()throws Exception
 		{
 			if(!btAdapter.isEnabled())
 			{
@@ -76,13 +86,14 @@ public class Bluetooth {
 			try {
 				// the server wait to connected with time out of 20 sec
 				sSocket = serverSocket.accept(TIME_OUT);
-				serverSocket = null;
+				// iharel: serverSocket = null;
 				if (sSocket != null) {
 					// cancel the scanning because is slowly the connection
+					serverSocket.close();
 					btAdapter.cancelDiscovery();
 				}
-			} catch (IOException e) {
-				publishProgress();
+			} catch (IOException e) {// if serverSocket.accept() threw an exception or cancelDiscovery, we want to call the serverClosed method
+				publishProgress(); 
 				this.cancel(true);
 			}
 			return null;
@@ -95,7 +106,7 @@ public class Bluetooth {
 			this.serverClosed = serverClosed;
 		}
 	}
-	public class Client extends AsyncTask<Void, String, Void>
+	public class BluetoothClientThread extends AsyncTask<Void, String, Void>
 	{
 		private BluetoothDevice device;
 		
@@ -126,23 +137,23 @@ public class Bluetooth {
 			Toast.makeText(context,values[0] ,Toast.LENGTH_SHORT).show();
 		}
 	}
-	public Server createServer()
+	public BluetoothServerThread createServer()
 	{
-		return new Server();
+		return new BluetoothServerThread();
 	}
-	public Client createClient()
+	public BluetoothClientThread createClient()
 	{
-		return new Client();
+		return new BluetoothClientThread();
 	}
-	public BluetoothAdapter getInstanceAdapter()
+	public BluetoothAdapter getAdapterInstance()
 	{
 		return btAdapter;
 	}
-	public BluetoothSocket getSocketServer()
+	public BluetoothSocket getServerSocket()
 	{
 		return sSocket;
 	}
-	public BluetoothSocket getSocketClient()
+	public BluetoothSocket getClientSocket()
 	{
 		return cSocket;
 	}
@@ -151,7 +162,9 @@ public class Bluetooth {
 		cSocket = null;
 		sSocket = null;
 	}
-	interface IServerClosed {
+	
+	interface IServerClosed 
+	{ // Interface forcing implementation of a method taking care of serverClose event. 
 		void serverClosed();
 	}
 }
