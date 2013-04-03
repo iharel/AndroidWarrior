@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:orientation="vertical">
+    
+     <Button 
+	    android:id="@+id/butUploadPost"
+	    android:layout_width="wrap_content"
+	    android:layout_height="wrap_content"
+	    android:text="@string/uploadPost"/>
+    <Button 
+		android:id="@+id/butResume"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="@string/resume"/>
+	<Button 
+		android:id="@+id/butRematch"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="@string/rematch"/>
+	 <Button 
+		android:id="@+id/butClose"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="@string/close"/>
+</LinearLayout>

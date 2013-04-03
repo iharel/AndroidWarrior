@@ -1,0 +1,7 @@
+this key for development to facebook application
+we need put this key hash
+for found this key we need to use in keytool software 
+below we have link to guide how to found this key
+http://www.helloandroid.com/tutorials/using-facebook-sdk-android-development-part-1
+vDif5kOyhKxWsjwHy0CzITGy17c=
+

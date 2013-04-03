@@ -1,19 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <string name="app_id">140017532836719</string>
     <string name="app_name">Warrior</string>
-    <string name="enable">enable</string>
-    <string name="disable">disable</string>
-    <string name="close">close</string>
-    <string name="openServer">open server</string>
-    <string name="scan">scan</string>
-    <string name="sync">start sync</string>
-    <string name="noDevices">no devices to connection</string>
-    <string name="start">start</string>
-    <string name="exit">exit</string>
-    <string name="waitToStart">wait to start</string>
     
-    <string name="speedTestPhone">speed test phone</string>
-    <string name="back">back</string>
+    <string name="waitToStart">wait to start</string>
+        
+    <!-- text buttons -->
+    <string name="close">close</string>
+    <string name="cancel">cancel</string>
+    <string name="uploadPost">upload post</string>
+    <string name="rematch">rematch</string>
+    <string name="resume">resume</string>
+    <string name="noDevices">no devices to connection</string>
+    <string name="facebook_login">facebook login</string>
+    <string name="facebook_logout">facebook logout</string>
+    
+    <!-- text buttons game and layout -->
+    <string name="speed_test_phone">speed test phone</string>
+    <string name="speed_click">speed click</string>
+    <string name="speed_calculation">seed calculation</string>
+    <string name="select_game">selelct game</string>
+    <string name="wait_select_game">wait to select game</string>
 
 </resources>

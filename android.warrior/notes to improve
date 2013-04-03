@@ -1,0 +1,9 @@
+Parts that do not work
+
+1) not always a client side finished winner  in successfully
+2) not always a game started (lunching game not started) 
+3) bluetooth not always successfully to connection to other device
+4) after device winner a background of activity show in red to 1 sec
+5) when a bluetooth turn on and application start up the connection to facebook not success
+6) speed calculation game not finished. we need to improve
+7) add unregister from bluetooth 

@@ -4,13 +4,24 @@
     android:versionCode="1"
     android:versionName="1.0" >
 
-    <uses-sdk android:minSdkVersion="8" />
-
+    <uses-sdk android:minSdkVersion="8" android:targetSdkVersion="8"/>
+	<uses-permission android:name="android.permission.BLUETOOTH" />
+	<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+	<uses-permission android:name="android.permission.INTERNET"/>
+    
     <application
         android:name="com.warrior.main.MyApp"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name" >
         
+        <meta-data android:name="com.facebook.sdk.ApplicationId" android:value="@string/app_id"/>
+        
+         <activity 
+             android:label="@string/app_name" 
+             android:name="com.facebook.LoginActivity">
+         </activity>
+         
         <activity
             android:name="com.warrior.main.MainActivity"
             android:label="@string/app_name" >
@@ -22,22 +33,45 @@
         
         <activity
             android:name="com.warrior.main.SelectGameActivity"
-            android:label="@string/app_name" >
+            android:label="@string/select_game" >
         </activity>
         
         <activity
-            android:name="com.warrior.games.SpeedTestPhoneServer"
+            android:name="com.warrior.main.WaitToSelectGameActivity"
+            android:label="@string/wait_select_game" >
+        </activity>
+        
+        <activity
+            android:name="com.warrior.games.activitys.SpeedTestPhoneGameActivity"
+            android:label="@string/speed_test_phone">
+        </activity>
+        
+        <activity
+            android:name="com.warrior.games.activitys.SpeedClickGameActivity"
+            android:label="@string/speed_click" >
+        </activity>
+        
+        <activity 
+            android:name="com.warrior.games.activitys.SpeedCalculationGameActivity"
+            android:label="@string/speed_calculation" >
+        </activity>
+        
+         <activity 
+            android:name="com.warrior.games.activitys.InputTextFragmentLayout"
+            android:label="upload post"
+            android:theme="@android:style/Theme.InputMethod">
+        </activity>
+        
+        <activity
+            android:name="com.warrior.main.HelpActivity"
             android:label="@string/app_name" >
         </activity>
         
-         <activity
-            android:name="com.warrior.games.SpeedTestPhoneClient"
+         <activity 
+            android:name="com.warrior.main.AboutActivity"
             android:label="@string/app_name" >
         </activity>
         
     </application>
-	<uses-permission android:name="android.permission.BLUETOOTH" />
-	<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 	
 </manifest>
